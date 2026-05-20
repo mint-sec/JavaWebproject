@@ -9,6 +9,7 @@ public record DashboardResponse(
         SafeRange safeRange,
         Summary summary,
         Route route,
+        RiskAssessmentResponse latestRiskAssessment,
         List<TelemetryPointResponse> temperatureHistory,
         List<AlertResponse> alerts) {
     public record SafeRange(double min, double max) {
@@ -30,7 +31,8 @@ public record DashboardResponse(
             String status,
             CurrentPosition currentPosition,
             List<Point> pathPoints,
-            List<Destination> destinations) {
+            List<Destination> destinations,
+            List<RoutePlanResponse> recommendations) {
     }
 
     public record CurrentPosition(double lng, double lat) {

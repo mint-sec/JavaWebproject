@@ -69,11 +69,44 @@
 - Method: `GET`
 - Path: `/api/v1/alerts/{alertId}`
 
+## 9. 获取告警汇总
+
+- Method: `GET`
+- Path: `/api/v1/vehicles/{vehicleCode}/alerts/summary`
+
+## 10. 获取最新风险评估结果
+
+- Method: `GET`
+- Path: `/api/v1/vehicles/{vehicleCode}/risk-assessments/latest`
+
+## 11. 获取风险评估历史
+
+- Method: `GET`
+- Path: `/api/v1/vehicles/{vehicleCode}/risk-assessments/history`
+- Query: `limit`
+
+## 12. 获取最新路径建议
+
+- Method: `GET`
+- Path: `/api/v1/vehicles/{vehicleCode}/route-plans/latest`
+
+## 13. 获取路径建议列表
+
+- Method: `GET`
+- Path: `/api/v1/vehicles/{vehicleCode}/route-plans`
+- Query: `limit`
+
+## 14. 获取算法网关状态
+
+- Method: `GET`
+- Path: `/api/v1/algorithm/status`
+
 ## 说明
 
-当前版本仍使用 mock 数据，目的是先满足 PRD 中：
+当前版本仍使用 mock 数据与 mock 算法网关，目的是先满足 PRD 中：
 
 - 后端服务成型
 - 数据结构稳定
 - 前端接口可联调
-- 后续算法接入点清晰
+- 风险评估接口可联调
+- 后续真实 Python 算法服务接入点清晰

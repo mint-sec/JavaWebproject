@@ -8,3 +8,9 @@ server:
 logging:
   pattern:
     level: "[%X{traceId}] %5p"
+
+app:
+  algorithm:
+    mode: mock-http-gateway
+    version: mock-risk-v1
+    fallback-enabled: true

@@ -55,11 +55,15 @@ public class HomeController {
                     <ul>
                       <li><a href="/api-docs">/api-docs</a></li>
                       <li><a href="/health">/health</a></li>
+                      <li><a href="/api/v1/algorithm/status">/api/v1/algorithm/status</a></li>
                       <li><a href="/api/v1/vehicles">/api/v1/vehicles</a></li>
                       <li><a href="/api/v1/dashboard/vehicles/CC-VA-01">/api/v1/dashboard/vehicles/CC-VA-01</a></li>
                       <li><a href="/api/v1/vehicles/CC-VA-01/telemetry/latest">/api/v1/vehicles/CC-VA-01/telemetry/latest</a></li>
                       <li><a href="/api/v1/vehicles/CC-VA-01/telemetry/history?minutes=30">/api/v1/vehicles/CC-VA-01/telemetry/history?minutes=30</a></li>
                       <li><a href="/api/v1/vehicles/CC-VA-01/alerts?limit=2">/api/v1/vehicles/CC-VA-01/alerts?limit=2</a></li>
+                      <li><a href="/api/v1/vehicles/CC-VA-01/alerts/summary">/api/v1/vehicles/CC-VA-01/alerts/summary</a></li>
+                      <li><a href="/api/v1/vehicles/CC-VA-01/risk-assessments/latest">/api/v1/vehicles/CC-VA-01/risk-assessments/latest</a></li>
+                      <li><a href="/api/v1/vehicles/CC-VA-01/route-plans/latest">/api/v1/vehicles/CC-VA-01/route-plans/latest</a></li>
                     </ul>
                   </div>
                 </body>
@@ -96,11 +100,17 @@ public class HomeController {
                       <ul>
                         <li><a href="/">返回首页</a></li>
                         <li><a href="/health">健康检查</a></li>
+                        <li><a href="/api/v1/algorithm/status">算法网关状态</a></li>
                         <li><a href="/api/v1/vehicles">获取车辆列表</a></li>
                         <li><a href="/api/v1/dashboard/vehicles/CC-VA-01">获取大屏聚合数据</a></li>
                         <li><a href="/api/v1/vehicles/CC-VA-01/telemetry/latest">获取车辆最新温度数据</a></li>
                         <li><a href="/api/v1/vehicles/CC-VA-01/telemetry/history?minutes=30">获取历史温度数据</a></li>
                         <li><a href="/api/v1/vehicles/CC-VA-01/alerts?limit=1">获取车辆告警记录</a></li>
+                        <li><a href="/api/v1/vehicles/CC-VA-01/alerts/summary">获取告警汇总</a></li>
+                        <li><a href="/api/v1/vehicles/CC-VA-01/risk-assessments/latest">获取最新风险评估</a></li>
+                        <li><a href="/api/v1/vehicles/CC-VA-01/risk-assessments/history?limit=3">获取风险评估历史</a></li>
+                        <li><a href="/api/v1/vehicles/CC-VA-01/route-plans/latest">获取最新调度建议</a></li>
+                        <li><a href="/api/v1/vehicles/CC-VA-01/route-plans?limit=2">获取调度建议列表</a></li>
                       </ul>
                     </div>
                     <div class="card">
@@ -119,8 +129,14 @@ public class HomeController {
                         <li><code>GET /api/v1/vehicles/{vehicleCode}/telemetry/latest</code></li>
                         <li><code>GET /api/v1/vehicles/{vehicleCode}/telemetry/history?minutes=30</code></li>
                         <li><code>GET /api/v1/vehicles/{vehicleCode}/alerts?limit=4</code></li>
+                        <li><code>GET /api/v1/vehicles/{vehicleCode}/alerts/summary</code></li>
+                        <li><code>GET /api/v1/vehicles/{vehicleCode}/risk-assessments/latest</code></li>
+                        <li><code>GET /api/v1/vehicles/{vehicleCode}/risk-assessments/history?limit=10</code></li>
+                        <li><code>GET /api/v1/vehicles/{vehicleCode}/route-plans/latest</code></li>
+                        <li><code>GET /api/v1/vehicles/{vehicleCode}/route-plans?limit=10</code></li>
                         <li><code>GET /api/v1/alerts?vehicleCode=CC-VA-01&page=1&pageSize=20</code></li>
                         <li><code>GET /api/v1/alerts/{alertId}</code></li>
+                        <li><code>GET /api/v1/algorithm/status</code></li>
                       </ul>
                     </div>
                   </div>

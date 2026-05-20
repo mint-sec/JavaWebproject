@@ -2,6 +2,8 @@ package com.coldchain.backend.service;
 
 import com.coldchain.backend.dto.AlertResponse;
 import com.coldchain.backend.dto.DashboardResponse;
+import com.coldchain.backend.dto.RiskAssessmentResponse;
+import com.coldchain.backend.dto.RoutePlanResponse;
 import com.coldchain.backend.dto.TelemetryPointResponse;
 import com.coldchain.backend.entity.TelemetryRecord;
 import com.coldchain.backend.entity.Vehicle;
@@ -16,9 +18,11 @@ public class DashboardService {
     private static final DateTimeFormatter ETA_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final VehicleService vehicleService;
+    private final AnalysisService analysisService;
 
-    public DashboardService(VehicleService vehicleService) {
+    public DashboardService(VehicleService vehicleService, AnalysisService analysisService) {
         this.vehicleService = vehicleService;
+        this.analysisService = analysisService;
     }
 
     public DashboardResponse getVehicleDashboard(String vehicleCode) {
@@ -27,20 +31,23 @@ public class DashboardService {
         TelemetryRecord latest = telemetry.get(telemetry.size() - 1);
         List<TelemetryPointResponse> history = vehicleService.getTelemetryHistory(vehicleCode, 30);
         List<AlertResponse> alerts = vehicleService.getVehicleAlerts(vehicleCode, 4);
+        RiskAssessmentResponse risk = analysisService.getLatestRiskAssessment(vehicleCode);
+        RoutePlanResponse latestRoutePlan = analysisService.getLatestRoutePlan(vehicleCode);
+        List<RoutePlanResponse> routePlans = analysisService.getRoutePlans(vehicleCode, 2);
 
         DashboardResponse.Summary summary = new DashboardResponse.Summary(
                 latest.temperature(),
                 latest.humidity(),
                 latest.speed(),
                 latest.doorOpen(),
-                "HIGH",
-                "高风险",
+                risk.riskLevel(),
+                risk.riskLabel(),
                 latest.remainingKm(),
                 latest.recordTime().plusMinutes(46).format(ETA_TIME),
                 latest.trend());
 
         DashboardResponse.Route route = new DashboardResponse.Route(
-                "候选方案: 改道冷库",
+                latestRoutePlan.planTitle(),
                 new DashboardResponse.CurrentPosition(latest.lng(), latest.lat()),
                 List.of(
                         new DashboardResponse.Point(116.360, 39.900),
@@ -50,7 +57,8 @@ public class DashboardService {
                 List.of(
                         new DashboardResponse.Destination("配送中心", 116.360, 39.900, "origin"),
                         new DashboardResponse.Destination("医院 A", 116.384, 39.903, "waypoint"),
-                        new DashboardResponse.Destination("冷库 C1", 116.402, 39.910, "cold-storage")));
+                        new DashboardResponse.Destination("冷库 C1", 116.402, 39.910, "cold-storage")),
+                routePlans);
 
         return new DashboardResponse(
                 vehicle.vehicleCode(),
@@ -59,6 +67,7 @@ public class DashboardService {
                 new DashboardResponse.SafeRange(vehicle.safeTempMin(), vehicle.safeTempMax()),
                 summary,
                 route,
+                risk,
                 history,
                 alerts);
     }

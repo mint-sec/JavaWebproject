@@ -56,9 +56,11 @@ CREATE TABLE risk_assessments (
     vehicle_code VARCHAR(32) NOT NULL,
     risk_score DECIMAL(6,2) NOT NULL,
     risk_level VARCHAR(16) NOT NULL,
+    risk_label VARCHAR(16) NOT NULL,
     risk_reason VARCHAR(255) NOT NULL,
     predicted_minutes_to_limit INT NULL,
     algorithm_version VARCHAR(32) NULL,
+    algorithm_source VARCHAR(32) NULL,
     assessment_time DATETIME NOT NULL,
     INDEX idx_risk_vehicle_time (vehicle_code, assessment_time)
 );
@@ -71,6 +73,7 @@ CREATE TABLE route_plans (
     plan_detail VARCHAR(255) NOT NULL,
     estimated_cost VARCHAR(128) NULL,
     estimated_benefit VARCHAR(128) NULL,
+    recommended TINYINT(1) NOT NULL DEFAULT 0,
     created_time DATETIME NOT NULL,
     INDEX idx_route_plan_vehicle_time (vehicle_code, created_time)
 );

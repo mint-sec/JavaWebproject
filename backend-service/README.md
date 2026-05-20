@@ -37,6 +37,10 @@ backend-service/
 - 大屏聚合接口
 - 历史温度查询接口
 - 告警列表与告警详情接口
+- 告警汇总接口
+- 风险评估接口与风险历史接口
+- 路径建议接口
+- mock 算法网关与降级结构
 
 ## 启动方式
 
@@ -63,10 +67,13 @@ powershell -ExecutionPolicy Bypass -File .\backend-service\scripts\start.ps1 -Po
 - `/api-docs`
 - `/api/v1/vehicles`
 - `/api/v1/dashboard/vehicles/CC-VA-01`
+- `/api/v1/vehicles/CC-VA-01/risk-assessments/latest`
+- `/api/v1/vehicles/CC-VA-01/route-plans/latest`
+- `/api/v1/algorithm/status`
 
 ## 下一步建议
 
 - 接入 MySQL 持久化
 - 把 mock 数据替换成 repository 层真实数据
-- 增加风险评估接口
-- 增加算法服务调用封装
+- 把 mock 算法网关替换成真实 Python 算法服务
+- 增加告警确认/关闭等写接口
