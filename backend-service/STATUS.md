@@ -1,41 +1,32 @@
 # 项目状态
 
-## 当前阶段
+## 当前状态
 
-- 当前状态：已完成第 1 周后端任务
+- 已迁移为正式 Spring Boot 工程
+- 已按 PRD 建立标准后端分层
+- 已完成第 1 周目标，并补充了第 2 周联调用的部分查询接口
+
+## 已实现接口
+
+- `GET /health`
+- `GET /api/v1/vehicles`
+- `GET /api/v1/dashboard/vehicles/{vehicleCode}`
+- `GET /api/v1/vehicles/{vehicleCode}/telemetry/latest`
+- `GET /api/v1/vehicles/{vehicleCode}/telemetry/history?minutes=30`
+- `GET /api/v1/vehicles/{vehicleCode}/alerts?limit=4`
+- `GET /api/v1/alerts?vehicleCode=CC-VA-01&page=1&pageSize=20`
+- `GET /api/v1/alerts/{alertId}`
+
+## 当前数据状态
+
 - 主场景：疫苗冷链配送
 - 模拟车辆：5 辆
-- 运行方式：Java 17 本地编译启动
+- 单车演示链路：CC-VA-01
+- 模拟数据：温度、湿度、速度、车门状态、经纬度、剩余里程、告警
 
-## 已完成内容
+## 待推进
 
-- 独立后端目录已建立
-- 初版数据库表结构已输出到 [schema.sql](/E:/codex_project/JavaWebproject/backend-service/sql/schema.sql)
-- 初版种子数据已输出到 [seed.sql](/E:/codex_project/JavaWebproject/backend-service/sql/seed.sql)
-- 3 个基础接口已实现
-- 模拟数据读取逻辑已实现
-
-## 接口清单
-
-### 1. 获取车辆信息
-
-- Method: `GET`
-- Path: `/api/v1/vehicles`
-
-### 2. 获取车辆最新温度数据
-
-- Method: `GET`
-- Path: `/api/v1/vehicles/{vehicleId}/telemetry/latest`
-
-### 3. 获取车辆告警记录
-
-- Method: `GET`
-- Path: `/api/v1/vehicles/{vehicleId}/alerts`
-- Query: `limit` 可选
-
-## 下一步
-
-- 补历史温度查询接口
-- 补历史告警查询接口
-- 预留算法服务调用入口
-- 把返回结构和错误处理继续标准化
+- MySQL 接入
+- 风险评分接口
+- 算法服务联调
+- 路径建议动态计算

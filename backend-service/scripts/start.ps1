@@ -3,25 +3,42 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$srcRoot = Join-Path $projectRoot "src"
-$buildDir = Join-Path $projectRoot ".build"
 
-if (-not (Test-Path $buildDir)) {
-    New-Item -ItemType Directory -Path $buildDir | Out-Null
+function Get-MavenCommand {
+    $wrapper = Join-Path $projectRoot "mvnw.cmd"
+    if (Test-Path $wrapper) {
+        return $wrapper
+    }
+
+    $command = Get-Command mvn.cmd,mvn -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -ne $command) {
+        return $command.Source
+    }
+
+    $jetBrainsRoot = Join-Path $env:ProgramFiles "JetBrains"
+    if (Test-Path $jetBrainsRoot) {
+        $candidate = Get-ChildItem -Path $jetBrainsRoot -Filter mvn.cmd -Recurse -ErrorAction SilentlyContinue |
+            Select-Object -First 1 -ExpandProperty FullName
+        if ($candidate) {
+            return $candidate
+        }
+    }
+
+    return $null
 }
 
-$javaFiles = Get-ChildItem -Path $srcRoot -Recurse -Filter *.java | ForEach-Object { $_.FullName }
-
-if (-not $javaFiles) {
-    throw "No Java source files found."
+$maven = Get-MavenCommand
+if ($null -eq $maven) {
+    throw "Maven was not found. Install Maven, add it to PATH, or open backend-service/pom.xml in IntelliJ IDEA."
 }
 
-javac -encoding UTF-8 -d $buildDir $javaFiles
-if ($LASTEXITCODE -ne 0) {
-    throw "Compilation failed."
-}
+$env:SERVER_PORT = "$Port"
+$env:SPRING_PROFILES_ACTIVE = "dev"
 
-$env:COLDCHAIN_PORT = "$Port"
-java -cp $buildDir com.coldchain.backend.ColdChainBackendApplication
+Push-Location $projectRoot
+try {
+    & $maven "-DskipTests" "spring-boot:run"
+} finally {
+    Pop-Location
+}

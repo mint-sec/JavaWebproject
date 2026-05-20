@@ -1,19 +1,23 @@
 # backend-service
 
-独立后端项目目录，只承接当前仓库里的后端开发工作，不改动现有前端代码。
+按 PRD 正式推进的 Java Spring Boot 后端项目。
 
-## 当前实现
+## 当前定位
 
-- Java 17 可直接编译运行
-- 3 个基础接口已完成
-- 5 辆疫苗冷链车模拟数据已内置
-- MySQL 初版表结构和种子数据已提供
+- 技术栈：Java 17 + Spring Boot
+- 当前阶段：完成第 1 周骨架，并补充了 PRD 中前后端联调所需的核心查询接口
+- 数据来源：内存模拟数据
+- 前端影响：不修改任何 `frontend/` 文件
 
 ## 目录结构
 
 ```text
 backend-service/
+  pom.xml
   src/
+    main/
+      java/
+      resources/
   sql/
   scripts/
   API.md
@@ -21,14 +25,20 @@ backend-service/
   STATUS.md
 ```
 
-## 默认端口
+## 已实现内容
 
-- 默认端口：`18081`
-- 可通过环境变量 `COLDCHAIN_PORT` 或启动脚本参数覆盖
+- Spring Boot 工程骨架
+- `controller / service / repository / dto / entity / config / exception` 分层
+- 统一响应结构
+- 全局异常处理
+- `X-Trace-Id` 请求跟踪
+- 首页与 `/api-docs` 接口文档页
+- 第 1 周基础接口
+- 大屏聚合接口
+- 历史温度查询接口
+- 告警列表与告警详情接口
 
 ## 启动方式
-
-在项目根目录执行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\backend-service\scripts\start.ps1
@@ -40,21 +50,23 @@ powershell -ExecutionPolicy Bypass -File .\backend-service\scripts\start.ps1
 powershell -ExecutionPolicy Bypass -File .\backend-service\scripts\start.ps1 -Port 18081
 ```
 
-## 接口
+说明：
 
-- `GET /api/v1/vehicles`
-- `GET /api/v1/vehicles/{vehicleId}/telemetry/latest`
-- `GET /api/v1/vehicles/{vehicleId}/alerts`
+- 启动脚本会优先使用 `mvnw.cmd`
+- 如果本机 PATH 中存在 `mvn`，也会直接使用
+- 如果都没有，会尝试查找 JetBrains 自带 Maven
 
-示例：
+## 关键地址
 
-- `http://localhost:18081/api/v1/vehicles`
-- `http://localhost:18081/api/v1/vehicles/CC-VA-01/telemetry/latest`
-- `http://localhost:18081/api/v1/vehicles/CC-VA-01/alerts?limit=1`
-- `http://localhost:18081/api-docs`
+- `/`
+- `/health`
+- `/api-docs`
+- `/api/v1/vehicles`
+- `/api/v1/dashboard/vehicles/CC-VA-01`
 
-## 后续建议
+## 下一步建议
 
-- 下一步优先补历史查询接口
-- 再接入算法服务做异常检测和风险评分
-- 最后补统一返回 DTO、日志和配置文件
+- 接入 MySQL 持久化
+- 把 mock 数据替换成 repository 层真实数据
+- 增加风险评估接口
+- 增加算法服务调用封装
