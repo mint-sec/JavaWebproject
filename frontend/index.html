@@ -4,93 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>冷链运输温控预警平台</title>
-    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="dashboard-shell">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Week 1 Frontend Prototype</p>
-          <h1>冷链运输温控预警平台</h1>
-        </div>
-        <div class="topbar-meta">
-          <div class="meta-card">
-            <span>监控场景</span>
-            <strong>疫苗冷链配送</strong>
-          </div>
-          <div class="meta-card">
-            <span>当前车辆</span>
-            <strong id="vehicle-id">CC-VA-01</strong>
-          </div>
-          <div class="meta-card">
-            <span>系统时间</span>
-            <strong id="system-time">--:--:--</strong>
-          </div>
-        </div>
-      </header>
-
-      <section class="summary-grid" id="summary-grid"></section>
-
-      <main class="dashboard-grid">
-        <section class="panel panel-map">
-          <div class="panel-head">
-            <div>
-              <p class="panel-kicker">车辆地图区域</p>
-              <h2>配送路径与车辆位置</h2>
-            </div>
-            <span class="pill" id="route-status">路线正常</span>
-          </div>
-          <div class="map-stage">
-            <svg id="route-map" viewBox="0 0 720 380" aria-label="车辆地图区域"></svg>
-            <div class="map-legend">
-              <span><i class="legend-dot origin"></i>配送中心</span>
-              <span><i class="legend-dot waypoint"></i>配送点</span>
-              <span><i class="legend-dot vehicle"></i>当前车辆</span>
-            </div>
-          </div>
-          <div class="route-footer" id="route-footer"></div>
-        </section>
-
-        <section class="panel panel-chart">
-          <div class="panel-head">
-            <div>
-              <p class="panel-kicker">温度折线图区域</p>
-              <h2>最近 30 分钟温度趋势</h2>
-            </div>
-            <span class="pill" id="temperature-state">温度平稳</span>
-          </div>
-          <div class="chart-stage">
-            <svg id="temperature-chart" viewBox="0 0 720 360" aria-label="温度趋势图"></svg>
-          </div>
-          <div class="chart-footer">
-            <div>
-              <span>安全温区</span>
-              <strong>2°C - 8°C</strong>
-            </div>
-            <div>
-              <span>当前温度</span>
-              <strong id="current-temperature">--.-°C</strong>
-            </div>
-            <div>
-              <span>预测趋势</span>
-              <strong id="trend-copy">--</strong>
-            </div>
-          </div>
-        </section>
-
-        <aside class="panel panel-alerts">
-          <div class="panel-head">
-            <div>
-              <p class="panel-kicker">告警信息面板</p>
-              <h2>实时预警与处置建议</h2>
-            </div>
-            <span class="pill danger" id="alert-count">0 条告警</span>
-          </div>
-          <div class="alerts-list" id="alerts-list"></div>
-        </aside>
-      </main>
-    </div>
-
-    <script src="./main.js"></script>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
   </body>
 </html>
