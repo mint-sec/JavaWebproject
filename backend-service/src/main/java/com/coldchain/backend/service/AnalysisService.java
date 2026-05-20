@@ -13,6 +13,7 @@ import com.coldchain.backend.exception.NotFoundException;
 import com.coldchain.backend.repository.MockDataRepository;
 import com.coldchain.backend.service.algorithm.AlgorithmEvaluation;
 import com.coldchain.backend.service.algorithm.AlgorithmGateway;
+import com.coldchain.backend.service.algorithm.AlgorithmGatewayStatus;
 import com.coldchain.backend.service.algorithm.AlgorithmRecommendation;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -27,29 +28,23 @@ public class AnalysisService {
 
     private final MockDataRepository repository;
     private final VehicleService vehicleService;
+    private final SimulationTimelineService simulationTimelineService;
     private final AlgorithmGateway algorithmGateway;
-    private final String algorithmMode;
-    private final String algorithmVersion;
-    private final boolean fallbackEnabled;
 
     public AnalysisService(
             MockDataRepository repository,
             VehicleService vehicleService,
-            AlgorithmGateway algorithmGateway,
-            @Value("${app.algorithm.mode:mock-http-gateway}") String algorithmMode,
-            @Value("${app.algorithm.version:mock-risk-v1}") String algorithmVersion,
-            @Value("${app.algorithm.fallback-enabled:true}") boolean fallbackEnabled) {
+            SimulationTimelineService simulationTimelineService,
+            AlgorithmGateway algorithmGateway) {
         this.repository = repository;
         this.vehicleService = vehicleService;
+        this.simulationTimelineService = simulationTimelineService;
         this.algorithmGateway = algorithmGateway;
-        this.algorithmMode = algorithmMode;
-        this.algorithmVersion = algorithmVersion;
-        this.fallbackEnabled = fallbackEnabled;
     }
 
     public AlertSummaryResponse getAlertSummary(String vehicleCode) {
-        List<AlertRecord> alerts = repository.findAlertsByVehicleCode(vehicleCode);
         vehicleService.getVehicleEntity(vehicleCode);
+        List<AlertRecord> alerts = simulationTimelineService.getCurrentAlerts(vehicleCode);
         if (alerts.isEmpty()) {
             return new AlertSummaryResponse(vehicleCode, 0, "NONE", false, null, null);
         }
@@ -71,7 +66,7 @@ public class AnalysisService {
 
     public RiskAssessmentResponse getLatestRiskAssessment(String vehicleCode) {
         Vehicle vehicle = vehicleService.getVehicleEntity(vehicleCode);
-        List<RiskAssessmentRecord> history = repository.findRiskAssessmentsByVehicleCode(vehicleCode);
+        List<RiskAssessmentRecord> history = simulationTimelineService.getCurrentRiskAssessments(vehicleCode);
         if (!history.isEmpty()) {
             return toRiskResponse(history.get(0));
         }
@@ -80,7 +75,7 @@ public class AnalysisService {
 
     public List<RiskAssessmentResponse> getRiskAssessmentHistory(String vehicleCode, Integer limit) {
         vehicleService.getVehicleEntity(vehicleCode);
-        List<RiskAssessmentResponse> results = repository.findRiskAssessmentsByVehicleCode(vehicleCode).stream()
+        List<RiskAssessmentResponse> results = simulationTimelineService.getCurrentRiskAssessments(vehicleCode).stream()
                 .map(this::toRiskResponse)
                 .toList();
         if (limit == null || limit <= 0 || limit >= results.size()) {
@@ -91,14 +86,16 @@ public class AnalysisService {
 
     public RoutePlanResponse getLatestRoutePlan(String vehicleCode) {
         vehicleService.getVehicleEntity(vehicleCode);
-        return repository.findLatestRoutePlanByVehicleCode(vehicleCode)
-                .map(this::toRoutePlanResponse)
-                .orElseGet(() -> buildFallbackRoutePlan(vehicleCode));
+        List<RoutePlanRecord> plans = simulationTimelineService.getCurrentRoutePlans(vehicleCode);
+        if (!plans.isEmpty()) {
+            return toRoutePlanResponse(plans.get(0));
+        }
+        return buildFallbackRoutePlan(vehicleCode);
     }
 
     public List<RoutePlanResponse> getRoutePlans(String vehicleCode, Integer limit) {
         vehicleService.getVehicleEntity(vehicleCode);
-        List<RoutePlanResponse> results = repository.findRoutePlansByVehicleCode(vehicleCode).stream()
+        List<RoutePlanResponse> results = simulationTimelineService.getCurrentRoutePlans(vehicleCode).stream()
                 .map(this::toRoutePlanResponse)
                 .toList();
         if (results.isEmpty()) {
@@ -111,20 +108,20 @@ public class AnalysisService {
     }
 
     public AlgorithmStatusResponse getAlgorithmStatus() {
+        AlgorithmGatewayStatus status = algorithmGateway.status();
         return new AlgorithmStatusResponse(
-                "coldchain-algorithm-gateway",
-                algorithmMode,
-                true,
-                fallbackEnabled,
-                algorithmVersion,
-                "当前为 mock 算法网关，可平滑替换为真实 Python 算法服务");
+                status.serviceName(),
+                status.mode(),
+                status.available(),
+                status.fallbackEnabled(),
+                status.algorithmVersion(),
+                status.message());
     }
 
     private RiskAssessmentResponse evaluateRisk(String vehicleCode, Vehicle vehicle) {
-        TelemetryRecord latest = repository.findLatestTelemetryByVehicleCode(vehicleCode)
-                .orElseThrow(() -> new NotFoundException("未找到车辆最新温度数据: " + vehicleCode));
-        List<TelemetryRecord> telemetryHistory = repository.findTelemetryHistoryByVehicleCode(vehicleCode);
-        List<AlertRecord> alerts = repository.findAlertsByVehicleCode(vehicleCode);
+        TelemetryRecord latest = simulationTimelineService.getCurrentTelemetry(vehicleCode);
+        List<TelemetryRecord> telemetryHistory = simulationTimelineService.getCurrentTelemetryHistory(vehicleCode, Integer.MAX_VALUE);
+        List<AlertRecord> alerts = simulationTimelineService.getCurrentAlerts(vehicleCode);
         AlgorithmEvaluation evaluation = algorithmGateway.evaluate(vehicleCode, vehicle, latest, telemetryHistory, alerts);
 
         return new RiskAssessmentResponse(
@@ -159,10 +156,9 @@ public class AnalysisService {
 
     public List<AlgorithmRecommendation> buildDynamicRecommendations(String vehicleCode) {
         Vehicle vehicle = vehicleService.getVehicleEntity(vehicleCode);
-        TelemetryRecord latest = repository.findLatestTelemetryByVehicleCode(vehicleCode)
-                .orElseThrow(() -> new NotFoundException("未找到车辆最新温度数据: " + vehicleCode));
-        List<TelemetryRecord> history = repository.findTelemetryHistoryByVehicleCode(vehicleCode);
-        List<AlertRecord> alerts = repository.findAlertsByVehicleCode(vehicleCode);
+        TelemetryRecord latest = simulationTimelineService.getCurrentTelemetry(vehicleCode);
+        List<TelemetryRecord> history = simulationTimelineService.getCurrentTelemetryHistory(vehicleCode, Integer.MAX_VALUE);
+        List<AlertRecord> alerts = simulationTimelineService.getCurrentAlerts(vehicleCode);
         AlgorithmEvaluation evaluation = algorithmGateway.evaluate(vehicleCode, vehicle, latest, history, alerts);
         return new ArrayList<>(evaluation.recommendations());
     }

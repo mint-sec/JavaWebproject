@@ -9,14 +9,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
-public class MockAlgorithmGateway implements AlgorithmGateway {
+public class MockAlgorithmEngine {
     private final String algorithmVersion;
 
-    public MockAlgorithmGateway(@Value("${app.algorithm.version:mock-risk-v1}") String algorithmVersion) {
+    public MockAlgorithmEngine(@Value("${app.algorithm.version:mock-risk-v1}") String algorithmVersion) {
         this.algorithmVersion = algorithmVersion;
     }
 
-    @Override
     public AlgorithmEvaluation evaluate(
             String vehicleCode,
             Vehicle vehicle,
@@ -32,7 +31,7 @@ public class MockAlgorithmGateway implements AlgorithmGateway {
         String riskLabel = mapRiskLabel(riskLevel);
         Integer predictedMinutes = temperature >= 7.0 ? 12 : temperature >= 6.0 ? 20 : null;
 
-        List<AlgorithmRecommendation> recommendations = buildRecommendations(riskLevel, latestTelemetry);
+        List<AlgorithmRecommendation> recommendations = buildRecommendations(riskLevel);
         String anomalyReason = anomalyDetected
                 ? "连续升温且已触发多条预警，存在温控失稳风险"
                 : "当前温控处于可控范围内";
@@ -48,6 +47,16 @@ public class MockAlgorithmGateway implements AlgorithmGateway {
                 algorithmVersion,
                 "MOCK_GATEWAY",
                 recommendations);
+    }
+
+    public AlgorithmGatewayStatus status(boolean fallbackEnabled, String mode) {
+        return new AlgorithmGatewayStatus(
+                "coldchain-algorithm-gateway",
+                mode,
+                true,
+                fallbackEnabled,
+                algorithmVersion,
+                "当前为 mock 算法网关，可平滑替换为真实 Python 算法服务");
     }
 
     private double calculateRiskScore(Vehicle vehicle, TelemetryRecord latestTelemetry, int alertCount) {
@@ -76,7 +85,7 @@ public class MockAlgorithmGateway implements AlgorithmGateway {
         };
     }
 
-    private List<AlgorithmRecommendation> buildRecommendations(String riskLevel, TelemetryRecord latestTelemetry) {
+    private List<AlgorithmRecommendation> buildRecommendations(String riskLevel) {
         List<AlgorithmRecommendation> recommendations = new ArrayList<>();
         if ("HIGH".equals(riskLevel)) {
             recommendations.add(new AlgorithmRecommendation(

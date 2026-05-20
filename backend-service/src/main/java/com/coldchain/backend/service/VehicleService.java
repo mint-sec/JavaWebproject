@@ -19,9 +19,11 @@ public class VehicleService {
     private static final DateTimeFormatter SHORT_TIME = DateTimeFormatter.ofPattern("HH:mm");
 
     private final MockDataRepository repository;
+    private final SimulationTimelineService simulationTimelineService;
 
-    public VehicleService(MockDataRepository repository) {
+    public VehicleService(MockDataRepository repository, SimulationTimelineService simulationTimelineService) {
         this.repository = repository;
+        this.simulationTimelineService = simulationTimelineService;
     }
 
     public List<VehicleResponse> getVehicles() {
@@ -29,21 +31,21 @@ public class VehicleService {
     }
 
     public TelemetryLatestResponse getLatestTelemetry(String vehicleCode) {
-        TelemetryRecord record = repository.findLatestTelemetryByVehicleCode(vehicleCode)
-                .orElseThrow(() -> new NotFoundException("未找到车辆最新温度数据: " + vehicleCode));
+        validateVehicle(vehicleCode);
+        TelemetryRecord record = simulationTimelineService.getCurrentTelemetry(vehicleCode);
         return toLatestResponse(record);
     }
 
     public List<TelemetryPointResponse> getTelemetryHistory(String vehicleCode, int minutes) {
         validateVehicle(vehicleCode);
-        return repository.findTelemetryHistoryByVehicleCode(vehicleCode).stream()
+        return simulationTimelineService.getCurrentTelemetryHistory(vehicleCode, minutes).stream()
                 .map(this::toTelemetryPoint)
                 .toList();
     }
 
     public List<AlertResponse> getVehicleAlerts(String vehicleCode, Integer limit) {
         validateVehicle(vehicleCode);
-        List<AlertResponse> results = repository.findAlertsByVehicleCode(vehicleCode).stream()
+        List<AlertResponse> results = simulationTimelineService.getCurrentAlerts(vehicleCode).stream()
                 .map(this::toAlertResponse)
                 .toList();
         if (limit == null || limit <= 0 || limit >= results.size()) {
@@ -76,7 +78,7 @@ public class VehicleService {
 
     public List<TelemetryRecord> getTelemetryEntities(String vehicleCode) {
         validateVehicle(vehicleCode);
-        return repository.findTelemetryHistoryByVehicleCode(vehicleCode);
+        return simulationTimelineService.getCurrentTelemetryHistory(vehicleCode, Integer.MAX_VALUE);
     }
 
     private Vehicle validateVehicle(String vehicleCode) {

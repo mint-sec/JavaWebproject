@@ -12,4 +12,6 @@ public interface AlgorithmGateway {
             TelemetryRecord latestTelemetry,
             List<TelemetryRecord> telemetryHistory,
             List<AlertRecord> alerts);
+
+    AlgorithmGatewayStatus status();
 }
