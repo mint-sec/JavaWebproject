@@ -81,9 +81,16 @@ export function getHighestAlertLevel(alerts) {
   }, "LOW");
 }
 
+export function normalizeVehicle(item) {
+  return {
+    ...item,
+    vehicleId: item.vehicleId || item.vehicleCode || "",
+  };
+}
+
 export function normalizeTelemetry(item) {
   return {
-    vehicleId: item.vehicleId,
+    vehicleId: item.vehicleId || item.vehicleCode || "",
     recordTime: item.recordTime,
     temperature: Number(item.temperature) || 0,
     humidity: Number(item.humidity) || 0,
@@ -97,10 +104,52 @@ export function normalizeTelemetry(item) {
   };
 }
 
+export function normalizeHistoryPoint(item, fallback = {}) {
+  return {
+    sampleTime: item.sampleTime || item.time || item.recordTime?.split(" ")[1] || "--:--",
+    recordTime: item.recordTime || fallback.recordTime || "",
+    temperature: Number(item.temperature ?? fallback.temperature) || 0,
+    humidity: Number(item.humidity ?? fallback.humidity) || 0,
+    doorOpen: Boolean(item.doorOpen ?? fallback.doorOpen),
+    speed: Number(item.speed ?? fallback.speed) || 0,
+    outsideTemp: Number(item.outsideTemp ?? fallback.outsideTemp) || 0,
+    lng: Number(item.lng ?? fallback.lng) || 0,
+    lat: Number(item.lat ?? fallback.lat) || 0,
+    remainingKm: Number(item.remainingKm ?? fallback.remainingKm) || 0,
+    trend: item.trend || fallback.trend || "娓╁害骞崇ǔ",
+  };
+}
+
+export function buildDashboardHistory(items, latestTelemetry, route) {
+  const historyItems = Array.isArray(items) ? items : [];
+  const routePoints = [
+    ...(Array.isArray(route?.pathPoints) ? route.pathPoints : []),
+    ...(route?.currentPosition ? [route.currentPosition] : []),
+  ];
+  const fallbackPoint = routePoints[routePoints.length - 1] || latestTelemetry || {};
+
+  if (!historyItems.length) {
+    return latestTelemetry ? [normalizeHistoryPoint(latestTelemetry, fallbackPoint)] : [];
+  }
+
+  return historyItems.map((item, index) => {
+    const routeIndex =
+      routePoints.length > 1
+        ? Math.round((index / Math.max(historyItems.length - 1, 1)) * (routePoints.length - 1))
+        : 0;
+    const routePoint = routePoints[routeIndex] || fallbackPoint;
+    return normalizeHistoryPoint(item, {
+      ...latestTelemetry,
+      ...routePoint,
+    });
+  });
+}
+
 export function normalizeAlerts(items) {
   return (Array.isArray(items) ? items : [])
     .map((item) => ({
       ...item,
+      vehicleId: item.vehicleId || item.vehicleCode || "",
       level: normalizeLevel(item.level),
     }))
     .sort((left, right) => levelPriority[normalizeLevel(right.level)] - levelPriority[normalizeLevel(left.level)]);

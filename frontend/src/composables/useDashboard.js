@@ -5,6 +5,7 @@ import {
   MAX_ALERTS,
   MAX_HISTORY,
   buildApiBaseCandidates,
+  buildDashboardHistory,
   buildFetchError,
   clamp,
   deriveRiskLevel,
@@ -14,6 +15,7 @@ import {
   levelLabel,
   normalizeAlerts,
   normalizeTelemetry,
+  normalizeVehicle,
   toneClass,
   vehicleStatusLabel,
 } from "./dashboardUtils";
@@ -194,7 +196,7 @@ export function useDashboard() {
       state.vehicles = browserMockVehicles;
     } else {
       const response = await fetchJson(`${state.apiBase}/vehicles`);
-      state.vehicles = Array.isArray(response.data) ? response.data : [];
+      state.vehicles = Array.isArray(response.data) ? response.data.map(normalizeVehicle) : [];
       state.dataSource = response.source;
     }
 
@@ -219,14 +221,19 @@ export function useDashboard() {
     try {
       let telemetryResponse;
       let alertsResponse;
+      let dashboardResponse;
 
       if (state.apiBase === "browser-mock") {
         [telemetryResponse, alertsResponse] = await createBrowserMockDashboard(state.vehicleId, MAX_ALERTS);
       } else {
-        [telemetryResponse, alertsResponse] = await Promise.all([
+        [dashboardResponse, telemetryResponse] = await Promise.all([
+          fetchJson(`${state.apiBase}/dashboard/vehicles/${encodeURIComponent(state.vehicleId)}`),
           fetchJson(`${state.apiBase}/vehicles/${encodeURIComponent(state.vehicleId)}/telemetry/latest`),
-          fetchJson(`${state.apiBase}/vehicles/${encodeURIComponent(state.vehicleId)}/alerts?limit=${MAX_ALERTS}`),
         ]);
+        alertsResponse = {
+          data: dashboardResponse.data?.alerts || [],
+          source: dashboardResponse.source,
+        };
       }
 
       state.vehicleMeta = state.vehicles.find((item) => item.vehicleId === state.vehicleId) || state.vehicleMeta;
@@ -238,7 +245,13 @@ export function useDashboard() {
           : telemetryResponse.source === "mock" || alertsResponse.source === "mock"
             ? "mock"
             : "backend";
-      appendHistoryPoint(state.latestTelemetry);
+
+      if (state.apiBase === "browser-mock") {
+        appendHistoryPoint(state.latestTelemetry);
+      } else {
+        applyDashboardSnapshot(dashboardResponse.data, state.latestTelemetry);
+      }
+
       state.lastSyncAt = new Date();
       state.error = "";
 
@@ -321,6 +334,23 @@ export function useDashboard() {
 
     state.history = [...state.history, point].slice(-MAX_HISTORY);
     state.trajectory = state.history.map((item) => ({
+      lng: item.lng,
+      lat: item.lat,
+      sampleTime: item.sampleTime,
+      recordTime: item.recordTime,
+      remainingKm: item.remainingKm,
+    }));
+
+    if (!state.replayActive) {
+      state.chartFocusIndex = latestIndex.value;
+    }
+  }
+
+  function applyDashboardSnapshot(dashboard, latestTelemetry) {
+    const history = buildDashboardHistory(dashboard?.temperatureHistory, latestTelemetry, dashboard?.route).slice(-MAX_HISTORY);
+
+    state.history = history;
+    state.trajectory = history.map((item) => ({
       lng: item.lng,
       lat: item.lat,
       sampleTime: item.sampleTime,
