@@ -32,8 +32,8 @@ public class EvaluateController {
         // 2. 风险评分（传入异常结果做加成）
         RiskResult risk = riskScorer.calculate(request, anomaly);
 
-        // 3. 路径建议
-        var recommendations = routePlanner.generate(risk.getLevel());
+        // 3. 路径建议（传入遥测数据做场景细化）
+        var recommendations = routePlanner.generate(risk.getLevel(), request.getLatestTelemetry());
 
         // 4. 组装响应
         EvaluateResponse response = new EvaluateResponse();
@@ -44,7 +44,7 @@ public class EvaluateController {
         response.setRiskScore(risk.getScore());
         response.setRiskLevel(risk.getLevel());
         response.setRiskLabel(risk.getLabel());
-        response.setAlgorithmVersion("risk-v1");
+        response.setAlgorithmVersion("risk-v2");
         response.setAlgorithmSource("JAVA_HTTP");
         response.setRecommendations(recommendations);
 
