@@ -29,6 +29,7 @@ backend-service/
 
 - Spring Boot 工程骨架
 - `controller / service / repository / dto / entity / config / exception` 分层
+- JPA / MySQL 持久化骨架
 - 统一响应结构
 - 全局异常处理
 - `X-Trace-Id` 请求跟踪
@@ -60,6 +61,9 @@ powershell -ExecutionPolicy Bypass -File .\backend-service\scripts\start.ps1 -Po
 - 启动脚本会优先使用 `mvnw.cmd`
 - 如果本机 PATH 中存在 `mvn`，也会直接使用
 - 如果都没有，会尝试查找 JetBrains 自带 Maven
+- 当前默认数据源模式是 `mock`
+- 当前默认关闭 JPA / DataSource 自动装配，保证 mock 模式可直接启动
+- 如需切 MySQL，请先准备数据库，再恢复 DataSource/JPA 自动装配并把 `app.datasource.mode` 改成 `mysql`
 
 ## 关键地址
 
@@ -74,7 +78,6 @@ powershell -ExecutionPolicy Bypass -File .\backend-service\scripts\start.ps1 -Po
 
 ## 下一步建议
 
-- 接入 MySQL 持久化
-- 把 mock 数据替换成 repository 层真实数据
+- 完成 MySQL 查询实现并替换当前 mock repository 读取链路
 - 把 mock 算法网关替换成真实 Python 算法服务
 - 增加告警确认/关闭等写接口

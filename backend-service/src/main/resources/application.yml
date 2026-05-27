@@ -1,6 +1,18 @@
 spring:
   application:
     name: backend-service
+  datasource:
+    url: jdbc:mysql://localhost:3306/coldchain_mvp?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
 
 server:
   port: 18081
@@ -10,10 +22,12 @@ logging:
     level: "[%X{traceId}] %5p"
 
 app:
+  datasource:
+    mode: mock
   simulation:
     step-seconds: 5
   algorithm:
-    mode: mock-http-gateway
+    mode: http
     version: mock-risk-v1
     fallback-enabled: true
     base-url: http://localhost:5001

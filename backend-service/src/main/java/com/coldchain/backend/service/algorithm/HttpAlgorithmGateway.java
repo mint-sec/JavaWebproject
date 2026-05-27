@@ -73,12 +73,12 @@ public class HttpAlgorithmGateway {
                     .body(request)
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, (clientRequest, clientResponse) -> {
-                        throw new AlgorithmGatewayException("算法服务返回错误状态: " + clientResponse.getStatusCode());
+                        throw new AlgorithmGatewayException("Algorithm service returned error: " + clientResponse.getStatusCode());
                     })
                     .body(AlgorithmHttpResponse.class);
 
             if (response == null) {
-                throw new AlgorithmGatewayException("算法服务返回空响应");
+                throw new AlgorithmGatewayException("Algorithm service returned empty response");
             }
 
             return new AlgorithmEvaluation(
@@ -90,7 +90,7 @@ public class HttpAlgorithmGateway {
                     response.riskLevel(),
                     response.riskLabel(),
                     response.algorithmVersion() == null ? algorithmVersion : response.algorithmVersion(),
-                    response.algorithmSource() == null ? "PYTHON_HTTP" : response.algorithmSource(),
+                    response.algorithmSource() == null ? "HTTP_ALGORITHM" : response.algorithmSource(),
                     response.recommendations() == null
                             ? List.of()
                             : response.recommendations().stream()
@@ -106,7 +106,20 @@ public class HttpAlgorithmGateway {
             if (exception instanceof AlgorithmGatewayException gatewayException) {
                 throw gatewayException;
             }
-            throw new AlgorithmGatewayException("算法 HTTP 网关调用失败", exception);
+            throw new AlgorithmGatewayException("Algorithm HTTP gateway call failed", exception);
+        }
+    }
+
+    public boolean ping() {
+        try {
+            return restClient.get()
+                    .uri("/health")
+                    .retrieve()
+                    .toBodilessEntity()
+                    .getStatusCode()
+                    .is2xxSuccessful();
+        } catch (Exception exception) {
+            return false;
         }
     }
 
@@ -117,7 +130,7 @@ public class HttpAlgorithmGateway {
                 available,
                 fallbackEnabled,
                 algorithmVersion,
-                available ? "已切换到 HTTP 算法网关" : "HTTP 算法网关未连通，当前将使用降级策略");
+                available ? "HTTP algorithm gateway is available" : "HTTP algorithm gateway is unavailable");
     }
 
     public record AlgorithmEvaluateRequest(

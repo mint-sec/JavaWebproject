@@ -9,8 +9,6 @@ import com.coldchain.backend.entity.RiskAssessmentRecord;
 import com.coldchain.backend.entity.RoutePlanRecord;
 import com.coldchain.backend.entity.TelemetryRecord;
 import com.coldchain.backend.entity.Vehicle;
-import com.coldchain.backend.exception.NotFoundException;
-import com.coldchain.backend.repository.MockDataRepository;
 import com.coldchain.backend.service.algorithm.AlgorithmEvaluation;
 import com.coldchain.backend.service.algorithm.AlgorithmGateway;
 import com.coldchain.backend.service.algorithm.AlgorithmGatewayStatus;
@@ -19,24 +17,20 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AnalysisService {
     private static final DateTimeFormatter FULL_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    private final MockDataRepository repository;
     private final VehicleService vehicleService;
     private final SimulationTimelineService simulationTimelineService;
     private final AlgorithmGateway algorithmGateway;
 
     public AnalysisService(
-            MockDataRepository repository,
             VehicleService vehicleService,
             SimulationTimelineService simulationTimelineService,
             AlgorithmGateway algorithmGateway) {
-        this.repository = repository;
         this.vehicleService = vehicleService;
         this.simulationTimelineService = simulationTimelineService;
         this.algorithmGateway = algorithmGateway;
@@ -66,18 +60,17 @@ public class AnalysisService {
 
     public RiskAssessmentResponse getLatestRiskAssessment(String vehicleCode) {
         Vehicle vehicle = vehicleService.getVehicleEntity(vehicleCode);
-        List<RiskAssessmentRecord> history = simulationTimelineService.getCurrentRiskAssessments(vehicleCode);
-        if (!history.isEmpty()) {
-            return toRiskResponse(history.get(0));
-        }
         return evaluateRisk(vehicleCode, vehicle);
     }
 
     public List<RiskAssessmentResponse> getRiskAssessmentHistory(String vehicleCode, Integer limit) {
-        vehicleService.getVehicleEntity(vehicleCode);
-        List<RiskAssessmentResponse> results = simulationTimelineService.getCurrentRiskAssessments(vehicleCode).stream()
+        Vehicle vehicle = vehicleService.getVehicleEntity(vehicleCode);
+        List<RiskAssessmentResponse> results = new ArrayList<>();
+        results.add(evaluateRisk(vehicleCode, vehicle));
+        results.addAll(simulationTimelineService.getCurrentRiskAssessments(vehicleCode).stream()
                 .map(this::toRiskResponse)
-                .toList();
+                .toList());
+
         if (limit == null || limit <= 0 || limit >= results.size()) {
             return results;
         }
@@ -85,22 +78,12 @@ public class AnalysisService {
     }
 
     public RoutePlanResponse getLatestRoutePlan(String vehicleCode) {
-        vehicleService.getVehicleEntity(vehicleCode);
-        List<RoutePlanRecord> plans = simulationTimelineService.getCurrentRoutePlans(vehicleCode);
-        if (!plans.isEmpty()) {
-            return toRoutePlanResponse(plans.get(0));
-        }
-        return buildFallbackRoutePlan(vehicleCode);
+        List<RoutePlanResponse> plans = buildDynamicRoutePlans(vehicleCode);
+        return plans.get(0);
     }
 
     public List<RoutePlanResponse> getRoutePlans(String vehicleCode, Integer limit) {
-        vehicleService.getVehicleEntity(vehicleCode);
-        List<RoutePlanResponse> results = simulationTimelineService.getCurrentRoutePlans(vehicleCode).stream()
-                .map(this::toRoutePlanResponse)
-                .toList();
-        if (results.isEmpty()) {
-            results = List.of(buildFallbackRoutePlan(vehicleCode));
-        }
+        List<RoutePlanResponse> results = buildDynamicRoutePlans(vehicleCode);
         if (limit == null || limit <= 0 || limit >= results.size()) {
             return results;
         }
@@ -136,22 +119,27 @@ public class AnalysisService {
                 evaluation.algorithmSource());
     }
 
-    private RoutePlanResponse buildFallbackRoutePlan(String vehicleCode) {
+    private List<RoutePlanResponse> buildDynamicRoutePlans(String vehicleCode) {
         RiskAssessmentResponse risk = getLatestRiskAssessment(vehicleCode);
         List<AlgorithmRecommendation> recommendations = buildDynamicRecommendations(vehicleCode);
-        AlgorithmRecommendation recommendation = recommendations.stream()
-                .filter(AlgorithmRecommendation::recommended)
-                .findFirst()
-                .orElse(recommendations.get(0));
-        return new RoutePlanResponse(
-                vehicleCode,
-                recommendation.planType(),
-                recommendation.title(),
-                recommendation.detail() + " 当前风险等级：" + risk.riskLabel(),
-                recommendation.estimatedCost(),
-                recommendation.estimatedBenefit(),
-                recommendation.recommended(),
-                risk.assessmentTime());
+
+        if (recommendations.isEmpty()) {
+            return simulationTimelineService.getCurrentRoutePlans(vehicleCode).stream()
+                    .map(this::toRoutePlanResponse)
+                    .toList();
+        }
+
+        return recommendations.stream()
+                .map(recommendation -> new RoutePlanResponse(
+                        vehicleCode,
+                        recommendation.planType(),
+                        recommendation.title(),
+                        recommendation.detail() + " 当前风险等级：" + risk.riskLabel(),
+                        recommendation.estimatedCost(),
+                        recommendation.estimatedBenefit(),
+                        recommendation.recommended(),
+                        risk.assessmentTime()))
+                .toList();
     }
 
     public List<AlgorithmRecommendation> buildDynamicRecommendations(String vehicleCode) {

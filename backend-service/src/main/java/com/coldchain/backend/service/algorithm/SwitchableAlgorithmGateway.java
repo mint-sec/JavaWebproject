@@ -53,7 +53,8 @@ public class SwitchableAlgorithmGateway implements AlgorithmGateway {
         }
 
         try {
-            return httpAlgorithmGateway.status(fallbackEnabled, true, algorithmMode);
+            boolean available = httpAlgorithmGateway.ping();
+            return httpAlgorithmGateway.status(fallbackEnabled, available, algorithmMode);
         } catch (Exception exception) {
             return fallbackEnabled
                     ? mockAlgorithmEngine.status(true, algorithmMode + "-fallback")
