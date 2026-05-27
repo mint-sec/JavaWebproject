@@ -30,6 +30,10 @@ public class VehicleService {
         return repository.findAllVehicles().stream().map(this::toVehicleResponse).toList();
     }
 
+    public List<Vehicle> getVehicleEntities() {
+        return repository.findAllVehicles();
+    }
+
     public TelemetryLatestResponse getLatestTelemetry(String vehicleCode) {
         validateVehicle(vehicleCode);
         TelemetryRecord record = simulationTimelineService.getCurrentTelemetry(vehicleCode);

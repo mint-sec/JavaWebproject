@@ -1,10 +1,21 @@
 package com.coldchain.backend.repository;
 
+import com.coldchain.backend.config.DataSourceModeProperties;
 import com.coldchain.backend.entity.AlertRecord;
 import com.coldchain.backend.entity.RiskAssessmentRecord;
 import com.coldchain.backend.entity.RoutePlanRecord;
 import com.coldchain.backend.entity.TelemetryRecord;
 import com.coldchain.backend.entity.Vehicle;
+import com.coldchain.backend.entity.mysql.AlertRecordEntity;
+import com.coldchain.backend.entity.mysql.RiskAssessmentEntity;
+import com.coldchain.backend.entity.mysql.RoutePlanEntity;
+import com.coldchain.backend.entity.mysql.TelemetryRecordEntity;
+import com.coldchain.backend.entity.mysql.VehicleEntity;
+import com.coldchain.backend.repository.mysql.AlertRecordJpaRepository;
+import com.coldchain.backend.repository.mysql.RiskAssessmentJpaRepository;
+import com.coldchain.backend.repository.mysql.RoutePlanJpaRepository;
+import com.coldchain.backend.repository.mysql.TelemetryRecordJpaRepository;
+import com.coldchain.backend.repository.mysql.VehicleJpaRepository;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -15,13 +26,32 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class MockDataRepository {
+    private final DataSourceModeProperties dataSourceModeProperties;
+    private final VehicleJpaRepository vehicleJpaRepository;
+    private final TelemetryRecordJpaRepository telemetryRecordJpaRepository;
+    private final AlertRecordJpaRepository alertRecordJpaRepository;
+    private final RiskAssessmentJpaRepository riskAssessmentJpaRepository;
+    private final RoutePlanJpaRepository routePlanJpaRepository;
+
     private final List<Vehicle> vehicles = new ArrayList<>();
     private final List<TelemetryRecord> telemetryRecords = new ArrayList<>();
     private final List<AlertRecord> alerts = new ArrayList<>();
     private final List<RiskAssessmentRecord> riskAssessments = new ArrayList<>();
     private final List<RoutePlanRecord> routePlans = new ArrayList<>();
 
-    public MockDataRepository() {
+    public MockDataRepository(
+            DataSourceModeProperties dataSourceModeProperties,
+            VehicleJpaRepository vehicleJpaRepository,
+            TelemetryRecordJpaRepository telemetryRecordJpaRepository,
+            AlertRecordJpaRepository alertRecordJpaRepository,
+            RiskAssessmentJpaRepository riskAssessmentJpaRepository,
+            RoutePlanJpaRepository routePlanJpaRepository) {
+        this.dataSourceModeProperties = dataSourceModeProperties;
+        this.vehicleJpaRepository = vehicleJpaRepository;
+        this.telemetryRecordJpaRepository = telemetryRecordJpaRepository;
+        this.alertRecordJpaRepository = alertRecordJpaRepository;
+        this.riskAssessmentJpaRepository = riskAssessmentJpaRepository;
+        this.routePlanJpaRepository = routePlanJpaRepository;
         initVehicles();
         initTelemetry();
         initAlerts();
@@ -30,20 +60,35 @@ public class MockDataRepository {
     }
 
     public List<Vehicle> findAllVehicles() {
+        if (dataSourceModeProperties.useMysql()) {
+            return vehicleJpaRepository.findAll().stream().map(this::toVehicle).toList();
+        }
         return List.copyOf(vehicles);
     }
 
     public Optional<Vehicle> findVehicleByCode(String vehicleCode) {
+        if (dataSourceModeProperties.useMysql()) {
+            return vehicleJpaRepository.findByVehicleCode(vehicleCode).map(this::toVehicle);
+        }
         return vehicles.stream().filter(vehicle -> vehicle.vehicleCode().equals(vehicleCode)).findFirst();
     }
 
     public Optional<TelemetryRecord> findLatestTelemetryByVehicleCode(String vehicleCode) {
+        if (dataSourceModeProperties.useMysql()) {
+            return telemetryRecordJpaRepository.findFirstByVehicleCodeOrderByRecordTimeDesc(vehicleCode)
+                    .map(this::toTelemetryRecord);
+        }
         return telemetryRecords.stream()
                 .filter(record -> record.vehicleCode().equals(vehicleCode))
                 .max(Comparator.comparing(TelemetryRecord::recordTime));
     }
 
     public List<TelemetryRecord> findTelemetryHistoryByVehicleCode(String vehicleCode) {
+        if (dataSourceModeProperties.useMysql()) {
+            return telemetryRecordJpaRepository.findByVehicleCodeOrderByRecordTimeAsc(vehicleCode).stream()
+                    .map(this::toTelemetryRecord)
+                    .collect(Collectors.toList());
+        }
         return telemetryRecords.stream()
                 .filter(record -> record.vehicleCode().equals(vehicleCode))
                 .sorted(Comparator.comparing(TelemetryRecord::recordTime))
@@ -51,6 +96,11 @@ public class MockDataRepository {
     }
 
     public List<AlertRecord> findAlertsByVehicleCode(String vehicleCode) {
+        if (dataSourceModeProperties.useMysql()) {
+            return alertRecordJpaRepository.findByVehicleCodeOrderByTriggerTimeDesc(vehicleCode).stream()
+                    .map(this::toAlertRecord)
+                    .collect(Collectors.toList());
+        }
         return alerts.stream()
                 .filter(alert -> alert.vehicleCode().equals(vehicleCode))
                 .sorted(Comparator.comparing(AlertRecord::triggerTime).reversed())
@@ -58,10 +108,18 @@ public class MockDataRepository {
     }
 
     public Optional<AlertRecord> findAlertById(String alertId) {
+        if (dataSourceModeProperties.useMysql()) {
+            return alertRecordJpaRepository.findByAlertId(alertId).map(this::toAlertRecord);
+        }
         return alerts.stream().filter(alert -> alert.alertId().equals(alertId)).findFirst();
     }
 
     public List<RiskAssessmentRecord> findRiskAssessmentsByVehicleCode(String vehicleCode) {
+        if (dataSourceModeProperties.useMysql()) {
+            return riskAssessmentJpaRepository.findByVehicleCodeOrderByAssessmentTimeDesc(vehicleCode).stream()
+                    .map(this::toRiskAssessmentRecord)
+                    .collect(Collectors.toList());
+        }
         return riskAssessments.stream()
                 .filter(record -> record.vehicleCode().equals(vehicleCode))
                 .sorted(Comparator.comparing(RiskAssessmentRecord::assessmentTime).reversed())
@@ -69,12 +127,21 @@ public class MockDataRepository {
     }
 
     public Optional<RiskAssessmentRecord> findLatestRiskAssessmentByVehicleCode(String vehicleCode) {
+        if (dataSourceModeProperties.useMysql()) {
+            return riskAssessmentJpaRepository.findFirstByVehicleCodeOrderByAssessmentTimeDesc(vehicleCode)
+                    .map(this::toRiskAssessmentRecord);
+        }
         return riskAssessments.stream()
                 .filter(record -> record.vehicleCode().equals(vehicleCode))
                 .max(Comparator.comparing(RiskAssessmentRecord::assessmentTime));
     }
 
     public List<RoutePlanRecord> findRoutePlansByVehicleCode(String vehicleCode) {
+        if (dataSourceModeProperties.useMysql()) {
+            return routePlanJpaRepository.findByVehicleCodeOrderByCreatedTimeDesc(vehicleCode).stream()
+                    .map(this::toRoutePlanRecord)
+                    .collect(Collectors.toList());
+        }
         return routePlans.stream()
                 .filter(record -> record.vehicleCode().equals(vehicleCode))
                 .sorted(Comparator.comparing(RoutePlanRecord::createdTime).reversed())
@@ -82,6 +149,10 @@ public class MockDataRepository {
     }
 
     public Optional<RoutePlanRecord> findLatestRoutePlanByVehicleCode(String vehicleCode) {
+        if (dataSourceModeProperties.useMysql()) {
+            return routePlanJpaRepository.findFirstByVehicleCodeOrderByCreatedTimeDesc(vehicleCode)
+                    .map(this::toRoutePlanRecord);
+        }
         return routePlans.stream()
                 .filter(record -> record.vehicleCode().equals(vehicleCode))
                 .max(Comparator.comparing(RoutePlanRecord::createdTime));
@@ -100,7 +171,7 @@ public class MockDataRepository {
         telemetryRecords.add(new TelemetryRecord("CC-VA-01", LocalDateTime.of(2026, 5, 18, 9, 5), 4.9, 65.0, false, 46.0, 30.0, 116.372, 39.901, 24.9, "轻微升温"));
         telemetryRecords.add(new TelemetryRecord("CC-VA-01", LocalDateTime.of(2026, 5, 18, 9, 10), 5.4, 66.0, false, 42.0, 30.0, 116.384, 39.903, 22.2, "连续升温"));
         telemetryRecords.add(new TelemetryRecord("CC-VA-01", LocalDateTime.of(2026, 5, 18, 9, 15), 6.1, 68.0, true, 39.0, 30.0, 116.390, 39.905, 20.5, "开门导致升温"));
-        telemetryRecords.add(new TelemetryRecord("CC-VA-01", LocalDateTime.of(2026, 5, 18, 9, 20), 6.8, 69.0, false, 37.0, 31.0, 116.395, 39.907, 16.8, "12 分钟后可能越界"));
+        telemetryRecords.add(new TelemetryRecord("CC-VA-01", LocalDateTime.of(2026, 5, 18, 9, 20), 6.8, 69.0, false, 37.0, 31.0, 116.395, 39.907, 16.8, "12分钟后可能越界"));
         telemetryRecords.add(new TelemetryRecord("CC-VA-01", LocalDateTime.of(2026, 5, 18, 9, 25), 7.5, 70.0, false, 35.0, 31.0, 116.397, 39.908, 13.4, "逼近上限"));
 
         telemetryRecords.add(new TelemetryRecord("CC-VA-02", LocalDateTime.of(2026, 5, 18, 9, 10), 5.0, 64.0, false, 44.0, 30.0, 116.390, 39.906, 24.6, "温度平稳"));
@@ -126,7 +197,7 @@ public class MockDataRepository {
 
     private void initAlerts() {
         alerts.add(new AlertRecord("ALT-20260518-001", "CC-VA-01", "HIGH", "TREND_WARNING", "高风险临界告警", "疫苗车厢温度接近安全上限，剩余路线较长。", "比较最近冷库改道方案与继续配送方案的综合成本。", LocalDateTime.of(2026, 5, 18, 9, 25), "OPEN"));
-        alerts.add(new AlertRecord("ALT-20260518-002", "CC-VA-01", "MEDIUM", "PREDICTION_WARNING", "预测型预警", "若继续当前趋势，未来 12 分钟温度可能突破 8°C。", "优先完成最近高敏货物配送，减少暴露时间。", LocalDateTime.of(2026, 5, 18, 9, 20), "OPEN"));
+        alerts.add(new AlertRecord("ALT-20260518-002", "CC-VA-01", "MEDIUM", "PREDICTION_WARNING", "预测型预警", "若继续当前趋势，未来12分钟温度可能突破8°C。", "优先完成最近高敏货物配送，减少暴露时间。", LocalDateTime.of(2026, 5, 18, 9, 20), "OPEN"));
         alerts.add(new AlertRecord("ALT-20260518-003", "CC-VA-01", "MEDIUM", "DOOR_EVENT", "卸货开门温升", "车门开启造成温度快速上升，短时风险增加。", "缩短开门时长，完成站点作业后立即恢复制冷。", LocalDateTime.of(2026, 5, 18, 9, 15), "OPEN"));
         alerts.add(new AlertRecord("ALT-20260518-021", "CC-VA-02", "LOW", "NORMAL_STATUS", "运输状态正常", "当前温度处于安全区间内，运输状态稳定。", "继续按既定路线配送。", LocalDateTime.of(2026, 5, 18, 9, 25), "OPEN"));
         alerts.add(new AlertRecord("ALT-20260518-004", "CC-VA-03", "MEDIUM", "DOOR_EVENT", "多点卸货波动", "多点配送导致频繁开关门，温度控制波动增加。", "建议缩短站点停留时间并加强制冷检查。", LocalDateTime.of(2026, 5, 18, 9, 18), "OPEN"));
@@ -146,12 +217,77 @@ public class MockDataRepository {
     }
 
     private void initRoutePlans() {
-        routePlans.add(new RoutePlanRecord("CC-VA-01", "PRIORITY_DELIVERY", "优先配送最近医院", "缩短疫苗暴露时间，优先完成最近高敏站点配送。", "调整后续两站顺序", "减少约 18 分钟暴露时间", false, LocalDateTime.of(2026, 5, 18, 9, 24)));
-        routePlans.add(new RoutePlanRecord("CC-VA-01", "REROUTE_COLD_STORAGE", "改道最近冷库", "前往 3 公里外冷库进行临时控温，再重新规划后续配送。", "增加 8 分钟运输成本", "可在短时间内恢复控温", true, LocalDateTime.of(2026, 5, 18, 9, 25)));
+        routePlans.add(new RoutePlanRecord("CC-VA-01", "PRIORITY_DELIVERY", "优先配送最近医院", "缩短疫苗暴露时间，优先完成最近高敏站点配送。", "调整后续两站顺序", "减少约18分钟暴露时间", false, LocalDateTime.of(2026, 5, 18, 9, 24)));
+        routePlans.add(new RoutePlanRecord("CC-VA-01", "REROUTE_COLD_STORAGE", "改道最近冷库", "前往3公里外冷库进行临时控温，再重新规划后续配送。", "增加8分钟运输成本", "可在短时间内恢复控温", true, LocalDateTime.of(2026, 5, 18, 9, 25)));
         routePlans.add(new RoutePlanRecord("CC-VA-02", "FOLLOW_CURRENT_ROUTE", "按原计划配送", "当前温控风险较低，继续按原计划执行。", "无新增成本", "运输效率最优", true, LocalDateTime.of(2026, 5, 18, 9, 25)));
         routePlans.add(new RoutePlanRecord("CC-VA-03", "CHECK_REFRIGERATION", "检查车门与制冷状态", "当前建议先完成车门关闭与制冷检查，再继续原路线。", "无额外路线成本", "避免风险继续升高", true, LocalDateTime.of(2026, 5, 18, 9, 18)));
         routePlans.add(new RoutePlanRecord("CC-VA-04", "FOLLOW_CURRENT_ROUTE", "按原计划配送", "当前车辆状态平稳，可继续按原计划配送。", "无新增成本", "维持当前效率", true, LocalDateTime.of(2026, 5, 18, 9, 25)));
         routePlans.add(new RoutePlanRecord("CC-VA-05", "PRIORITY_DELIVERY", "优先配送最近站点", "建议优先完成最近高敏站点，降低超温暴露时间。", "小幅调整配送顺序", "减少温控风险扩散", true, LocalDateTime.of(2026, 5, 18, 9, 25)));
-        routePlans.add(new RoutePlanRecord("CC-VA-05", "REROUTE_COLD_STORAGE", "改道最近冷库", "如温度继续升高，优先前往最近冷库进行临时控温。", "增加约 6 分钟运输成本", "避免进入高风险状态", false, LocalDateTime.of(2026, 5, 18, 9, 24)));
+        routePlans.add(new RoutePlanRecord("CC-VA-05", "REROUTE_COLD_STORAGE", "改道最近冷库", "如温度继续升高，优先前往最近冷库进行临时控温。", "增加约6分钟运输成本", "避免进入高风险状态", false, LocalDateTime.of(2026, 5, 18, 9, 24)));
+    }
+
+    private Vehicle toVehicle(VehicleEntity entity) {
+        return new Vehicle(
+                entity.getId(),
+                entity.getVehicleCode(),
+                entity.getPlateNumber(),
+                entity.getCargoType(),
+                entity.getCargoName(),
+                entity.getSafeTempMin(),
+                entity.getSafeTempMax(),
+                entity.getStatus());
+    }
+
+    private TelemetryRecord toTelemetryRecord(TelemetryRecordEntity entity) {
+        return new TelemetryRecord(
+                entity.getVehicleCode(),
+                entity.getRecordTime(),
+                entity.getTemperature(),
+                entity.getHumidity(),
+                entity.isDoorOpen(),
+                entity.getSpeed(),
+                entity.getOutsideTemp(),
+                entity.getLng(),
+                entity.getLat(),
+                entity.getRemainingKm(),
+                entity.getTrend());
+    }
+
+    private AlertRecord toAlertRecord(AlertRecordEntity entity) {
+        return new AlertRecord(
+                entity.getAlertId(),
+                entity.getVehicleCode(),
+                entity.getAlertLevel(),
+                entity.getAlertType(),
+                entity.getTitle(),
+                entity.getDetailText(),
+                entity.getSuggestion(),
+                entity.getTriggerTime(),
+                entity.getStatus());
+    }
+
+    private RiskAssessmentRecord toRiskAssessmentRecord(RiskAssessmentEntity entity) {
+        return new RiskAssessmentRecord(
+                entity.getVehicleCode(),
+                entity.getRiskScore(),
+                entity.getRiskLevel(),
+                entity.getRiskLabel(),
+                entity.getRiskReason(),
+                entity.getPredictedMinutesToLimit(),
+                entity.getAssessmentTime(),
+                entity.getAlgorithmVersion(),
+                entity.getAlgorithmSource());
+    }
+
+    private RoutePlanRecord toRoutePlanRecord(RoutePlanEntity entity) {
+        return new RoutePlanRecord(
+                entity.getVehicleCode(),
+                entity.getPlanType(),
+                entity.getPlanTitle(),
+                entity.getPlanDetail(),
+                entity.getEstimatedCost(),
+                entity.getEstimatedBenefit(),
+                entity.isRecommended(),
+                entity.getCreatedTime());
     }
 }

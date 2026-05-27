@@ -90,7 +90,7 @@ public class HttpAlgorithmGateway {
                     response.riskLevel(),
                     response.riskLabel(),
                     response.algorithmVersion() == null ? algorithmVersion : response.algorithmVersion(),
-                    response.algorithmSource() == null ? "HTTP_ALGORITHM" : response.algorithmSource(),
+                    response.algorithmSource() == null ? "JAVA_HTTP" : response.algorithmSource(),
                     response.recommendations() == null
                             ? List.of()
                             : response.recommendations().stream()

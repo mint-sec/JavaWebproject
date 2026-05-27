@@ -17,7 +17,7 @@ public class SwitchableAlgorithmGateway implements AlgorithmGateway {
     public SwitchableAlgorithmGateway(
             MockAlgorithmEngine mockAlgorithmEngine,
             HttpAlgorithmGateway httpAlgorithmGateway,
-            @Value("${app.algorithm.mode:mock-http-gateway}") String algorithmMode,
+            @Value("${app.algorithm.mode:http-gateway}") String algorithmMode,
             @Value("${app.algorithm.fallback-enabled:true}") boolean fallbackEnabled) {
         this.mockAlgorithmEngine = mockAlgorithmEngine;
         this.httpAlgorithmGateway = httpAlgorithmGateway;
@@ -32,7 +32,7 @@ public class SwitchableAlgorithmGateway implements AlgorithmGateway {
             TelemetryRecord latestTelemetry,
             List<TelemetryRecord> telemetryHistory,
             List<AlertRecord> alerts) {
-        if (!"http".equalsIgnoreCase(algorithmMode)) {
+        if (!useHttpGateway()) {
             return mockAlgorithmEngine.evaluate(vehicleCode, vehicle, latestTelemetry, telemetryHistory, alerts);
         }
 
@@ -48,7 +48,7 @@ public class SwitchableAlgorithmGateway implements AlgorithmGateway {
 
     @Override
     public AlgorithmGatewayStatus status() {
-        if (!"http".equalsIgnoreCase(algorithmMode)) {
+        if (!useHttpGateway()) {
             return mockAlgorithmEngine.status(fallbackEnabled, algorithmMode);
         }
 
@@ -60,5 +60,9 @@ public class SwitchableAlgorithmGateway implements AlgorithmGateway {
                     ? mockAlgorithmEngine.status(true, algorithmMode + "-fallback")
                     : httpAlgorithmGateway.status(false, false, algorithmMode);
         }
+    }
+
+    private boolean useHttpGateway() {
+        return "http".equalsIgnoreCase(algorithmMode) || "http-gateway".equalsIgnoreCase(algorithmMode);
     }
 }

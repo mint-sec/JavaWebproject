@@ -18,3 +18,5 @@ dist/
 # 系统文件
 .DS_Store
 Thumbs.db
+application-local.yml
+backend-service/application-local.yml
