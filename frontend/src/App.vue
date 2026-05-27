@@ -9,6 +9,17 @@ import { useDashboard } from "./composables/useDashboard";
 const dashboard = useDashboard();
 
 const alertCountTone = computed(() => dashboard.toneClass(dashboard.highestLevel.value));
+const demoBadgeTone = computed(() => (dashboard.state.demoMode ? "warn" : ""));
+const dashboardTone = computed(() => {
+  const level = String(dashboard.highestLevel.value || "LOW").toLowerCase();
+  if (level === "high") {
+    return "risk-high";
+  }
+  if (level === "medium") {
+    return "risk-medium";
+  }
+  return "risk-low";
+});
 
 onMounted(() => {
   dashboard.initialize();
@@ -20,19 +31,25 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="dashboard-shell">
+  <div class="dashboard-shell" :class="dashboardTone">
     <header class="topbar">
       <div class="topbar-copy">
         <p class="eyebrow">Vue 3 + Vite Frontend</p>
         <h1>冷链运输温控预警平台</h1>
-        <p class="topbar-desc">前端已重构为 Vue 3 + Vite 工程，保持原有接口契约不变，支持实时轮询刷新、告警高亮、温度趋势联动和轨迹回放。</p>
+        <p class="topbar-desc">前端已重构为 Vue 3 + Vite，支持实时轮询、风险分级高亮、趋势联动与轨迹回放，适合录屏演示。</p>
+        <div class="hero-actions">
+          <button class="ghost-button primary" type="button" @click="dashboard.toggleDemoMode()">
+            {{ dashboard.state.demoMode ? "停止演示" : "自动演示" }}
+          </button>
+          <span class="pill" :class="demoBadgeTone">{{ dashboard.state.demoMessage }}</span>
+        </div>
       </div>
 
       <div class="topbar-meta">
         <div class="meta-card">
           <span>监控场景</span>
           <strong>{{ dashboard.sceneLabel.value }}</strong>
-          <small>单车监控大屏</small>
+          <small>单车监控大屏 · {{ dashboard.demoSteps[dashboard.state.demoStage]?.title }}</small>
         </div>
 
         <div class="meta-card meta-select">
@@ -45,11 +62,7 @@ onBeforeUnmount(() => {
               @change="dashboard.selectVehicle($event.target.value)"
             >
               <option v-if="!dashboard.state.vehicles.length" value="">等待载入</option>
-              <option
-                v-for="vehicle in dashboard.state.vehicles"
-                :key="vehicle.vehicleId"
-                :value="vehicle.vehicleId"
-              >
+              <option v-for="vehicle in dashboard.state.vehicles" :key="vehicle.vehicleId" :value="vehicle.vehicleId">
                 {{ vehicle.vehicleId }}
               </option>
             </select>
@@ -81,6 +94,29 @@ onBeforeUnmount(() => {
         <button class="ghost-button" type="button" :disabled="dashboard.state.isLoading" @click="dashboard.refreshNow()">
           立即刷新
         </button>
+      </div>
+    </section>
+
+    <section class="panel demo-flow">
+      <div class="panel-head">
+        <div>
+          <p class="panel-kicker">Demo Flow</p>
+          <h2>录屏与现场演示流程</h2>
+        </div>
+        <span class="pill" :class="demoBadgeTone">{{ dashboard.state.demoMode ? "自动轮播中" : "手动讲解模式" }}</span>
+      </div>
+
+      <div class="demo-step-list">
+        <article
+          v-for="(step, index) in dashboard.demoSteps"
+          :key="step.title"
+          class="demo-step"
+          :class="{ active: index === dashboard.state.demoStage }"
+        >
+          <span class="demo-step-index">0{{ index + 1 }}</span>
+          <strong>{{ step.title }}</strong>
+          <small>{{ step.description }}</small>
+        </article>
       </div>
     </section>
 

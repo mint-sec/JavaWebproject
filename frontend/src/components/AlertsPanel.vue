@@ -1,17 +1,8 @@
 <script setup>
 defineProps({
-  alerts: {
-    type: Array,
-    required: true,
-  },
-  alertCountTone: {
-    type: String,
-    default: "",
-  },
-  levelLabel: {
-    type: Function,
-    required: true,
-  },
+  alerts: { type: Array, required: true },
+  alertCountTone: { type: String, default: "" },
+  levelLabel: { type: Function, required: true },
 });
 </script>
 
@@ -29,7 +20,7 @@ defineProps({
       <template v-if="!alerts.length">
         <article class="empty-card">
           <h3>暂无告警</h3>
-          <p>当前车辆未返回告警记录，页面会继续保持轮询并自动刷新高亮状态。</p>
+          <p>当前车辆未返回告警记录，页面会继续轮询并自动刷新高亮状态。</p>
         </article>
       </template>
 
