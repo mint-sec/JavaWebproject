@@ -20,33 +20,6 @@ import {
   vehicleStatusLabel,
 } from "./dashboardUtils";
 
-const DEMO_STEPS = [
-  {
-    title: "总览启幕",
-    description: "先展示当前车辆的状态卡片、接口状态和整体风险。",
-    vehicleId: "CC-VA-01",
-    replay: false,
-  },
-  {
-    title: "风险切换",
-    description: "切到开门波动车辆，突出告警与温度变化。",
-    vehicleId: "CC-VA-03",
-    replay: false,
-  },
-  {
-    title: "高风险高亮",
-    description: "切到高风险车辆，强化红色预警和风险区分。",
-    vehicleId: "CC-VA-05",
-    replay: false,
-  },
-  {
-    title: "轨迹回放",
-    description: "回到主车并启动轨迹回放，适合录屏收尾展示。",
-    vehicleId: "CC-VA-01",
-    replay: true,
-  },
-];
-
 export function useDashboard() {
   const apiBaseFromQuery = new URLSearchParams(window.location.search).get("apiBase");
   const apiBaseCandidates = buildApiBaseCandidates(apiBaseFromQuery);
@@ -66,15 +39,10 @@ export function useDashboard() {
     error: "",
     dataSource: "backend",
     apiBase: "",
-    demoMode: false,
-    demoStage: 0,
-    demoMessage: "点击自动演示，可按风险、告警和轨迹顺序轮播。",
   });
 
   let pollingTimer = null;
   let replayTimer = null;
-  let demoTimer = null;
-  let demoLock = false;
 
   const latestIndex = computed(() => Math.max(state.history.length - 1, 0));
   const activeIndex = computed(() => clamp(state.chartFocusIndex ?? latestIndex.value, 0, latestIndex.value));
@@ -103,7 +71,7 @@ export function useDashboard() {
       return "模拟数据中";
     }
     if (state.lastSyncAt) {
-      return "接口已连通";
+      return "接口已连接";
     }
     return "准备连接";
   });
@@ -162,7 +130,7 @@ export function useDashboard() {
       },
       {
         label: "车厢状态",
-        value: state.latestTelemetry.doorOpen ? "开门中" : "已关门",
+        value: state.latestTelemetry.doorOpen ? "开门中" : "已关闭",
         extra: `湿度 ${formatNumber(state.latestTelemetry.humidity)}% · 外部 ${formatNumber(state.latestTelemetry.outsideTemp)}°C`,
       },
       {
@@ -198,20 +166,7 @@ export function useDashboard() {
       window.clearInterval(pollingTimer);
       pollingTimer = null;
     }
-    stopDemoMode(false);
     stopReplay(false);
-  }
-
-  function stopDemoMode(resetStage) {
-    if (demoTimer) {
-      window.clearInterval(demoTimer);
-      demoTimer = null;
-    }
-    state.demoMode = false;
-    if (resetStage) {
-      state.demoStage = 0;
-      state.demoMessage = "点击自动演示，可按风险、告警和轨迹顺序轮播。";
-    }
   }
 
   async function resolveApiBase() {
@@ -310,10 +265,7 @@ export function useDashboard() {
     }
   }
 
-  async function selectVehicle(nextVehicleId, preserveDemoMode = false) {
-    if (!preserveDemoMode) {
-      stopDemoMode(false);
-    }
+  async function selectVehicle(nextVehicleId) {
     stopReplay(false);
     state.vehicleId = nextVehicleId;
     state.vehicleMeta = state.vehicles.find((item) => item.vehicleId === state.vehicleId) || null;
@@ -323,57 +275,6 @@ export function useDashboard() {
     state.trajectory = [];
     state.chartFocusIndex = null;
     await refreshDashboard();
-  }
-
-  async function runDemoStep(stepIndex = state.demoStage) {
-    if (demoLock) {
-      return;
-    }
-
-    const step = DEMO_STEPS[stepIndex % DEMO_STEPS.length];
-    if (!step) {
-      return;
-    }
-
-    demoLock = true;
-    try {
-      state.demoMessage = `${step.title} · ${step.description}`;
-      await selectVehicle(step.vehicleId, true);
-      focusLatest();
-
-      if (step.replay) {
-        toggleReplay();
-      } else {
-        stopReplay(false);
-      }
-    } finally {
-      demoLock = false;
-    }
-  }
-
-  async function startDemoMode() {
-    if (state.demoMode) {
-      return;
-    }
-
-    stopDemoMode(false);
-    state.demoMode = true;
-    state.demoStage = 0;
-    await runDemoStep(0);
-
-    demoTimer = window.setInterval(() => {
-      state.demoStage = (state.demoStage + 1) % DEMO_STEPS.length;
-      void runDemoStep(state.demoStage);
-    }, 7000);
-  }
-
-  function toggleDemoMode() {
-    if (state.demoMode) {
-      stopDemoMode(true);
-      return;
-    }
-
-    void startDemoMode();
   }
 
   function refreshNow() {
@@ -487,7 +388,6 @@ export function useDashboard() {
 
   return {
     state,
-    demoSteps: DEMO_STEPS,
     activePoint,
     activeIndex,
     latestIndex,
@@ -507,7 +407,6 @@ export function useDashboard() {
     initialize,
     cleanup,
     selectVehicle,
-    toggleDemoMode,
     refreshNow,
     focusLatest,
     setActiveIndex,

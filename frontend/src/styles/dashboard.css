@@ -238,53 +238,6 @@ h2 {
   border-radius: var(--radius-lg);
 }
 
-.demo-flow {
-  margin-bottom: 16px;
-}
-
-.demo-step-list {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.demo-step {
-  border: 1px solid rgba(122, 189, 198, 0.18);
-  border-radius: 18px;
-  padding: 14px;
-  background: rgba(10, 34, 47, 0.72);
-}
-
-.demo-step.active {
-  border-color: var(--shell-accent, var(--sky));
-  box-shadow: 0 0 0 1px rgba(97, 216, 255, 0.14), 0 16px 32px rgba(0, 0, 0, 0.24);
-}
-
-.demo-step-index {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  margin-bottom: 10px;
-  border-radius: 10px;
-  background: rgba(97, 216, 255, 0.12);
-  color: var(--sky);
-  font-weight: 700;
-}
-
-.demo-step strong {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 16px;
-}
-
-.demo-step small {
-  display: block;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
 .status-actions {
   display: flex;
   align-items: center;
@@ -665,9 +618,6 @@ h2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .demo-step-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 720px) {
@@ -677,7 +627,6 @@ h2 {
 
   .summary-grid,
   .topbar-meta,
-  .demo-step-list,
   .map-legend,
   .chart-footer,
   .route-footer {
