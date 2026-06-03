@@ -35,6 +35,15 @@ public class VehicleEntity {
     @Column(name = "status", nullable = false, length = 32)
     private String status;
 
+    @Column(length = 32)
+    private String driver;
+
+    @Column(length = 128)
+    private String route;
+
+    @Column(name = "updated_at")
+    private java.time.LocalDateTime updatedAt;
+
     public Long getId() {
         return id;
     }
@@ -94,4 +103,13 @@ public class VehicleEntity {
     public void setStatus(String status) {
         this.status = status;
     }
+
+    public String getDriver() { return driver; }
+    public void setDriver(String driver) { this.driver = driver; }
+
+    public String getRoute() { return route; }
+    public void setRoute(String route) { this.route = route; }
+
+    public java.time.LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(java.time.LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

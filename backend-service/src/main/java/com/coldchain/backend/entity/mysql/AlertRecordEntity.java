@@ -42,6 +42,18 @@ public class AlertRecordEntity {
     @Column(name = "status", nullable = false, length = 16)
     private String status;
 
+    @Column(length = 64)
+    private String owner;
+
+    @Column(name = "process_status", length = 16)
+    private String processStatus;
+
+    @Column(length = 255)
+    private String note;
+
+    @Column(name = "handled_at")
+    private LocalDateTime handledAt;
+
     public Long getId() {
         return id;
     }
@@ -117,4 +129,16 @@ public class AlertRecordEntity {
     public void setStatus(String status) {
         this.status = status;
     }
+
+    public String getOwner() { return owner; }
+    public void setOwner(String owner) { this.owner = owner; }
+
+    public String getProcessStatus() { return processStatus; }
+    public void setProcessStatus(String processStatus) { this.processStatus = processStatus; }
+
+    public String getNote() { return note; }
+    public void setNote(String note) { this.note = note; }
+
+    public LocalDateTime getHandledAt() { return handledAt; }
+    public void setHandledAt(LocalDateTime handledAt) { this.handledAt = handledAt; }
 }

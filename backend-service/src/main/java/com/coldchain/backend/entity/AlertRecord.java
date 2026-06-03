@@ -11,5 +11,9 @@ public record AlertRecord(
         String detail,
         String suggestion,
         LocalDateTime triggerTime,
-        String status) {
+        String status,
+        String owner,
+        String processStatus,
+        String note,
+        LocalDateTime handledAt) {
 }

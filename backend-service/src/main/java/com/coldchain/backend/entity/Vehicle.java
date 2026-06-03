@@ -1,5 +1,7 @@
 package com.coldchain.backend.entity;
 
+import java.time.LocalDateTime;
+
 public record Vehicle(
         Long id,
         String vehicleCode,
@@ -8,5 +10,8 @@ public record Vehicle(
         String cargoName,
         double safeTempMin,
         double safeTempMax,
-        String status) {
+        String status,
+        String driver,
+        String route,
+        LocalDateTime updatedAt) {
 }

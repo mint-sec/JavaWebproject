@@ -25,6 +25,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ApiResponse.fail("请求参数校验失败"));
     }
 
+    @ExceptionHandler(AuthException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAuth(AuthException exception) {
+        return ResponseEntity.status(exception.getStatusCode()).body(ApiResponse.fail(exception.getMessage()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneric(Exception exception, HttpServletRequest request) {
         log.error("Unhandled exception on {}", request.getRequestURI(), exception);
