@@ -17,9 +17,10 @@ const props = defineProps({
   },
 });
 
-defineEmits(["open-admin", "logout"]);
+defineEmits(["open-admin", "open-vehicles", "logout"]);
 
-const dashboard = useDashboard();
+const dashboard = useDashboard(props.currentUser);
+const hasVehicles = computed(() => dashboard.state.vehicles.length > 0);
 
 const alertCountTone = computed(() => dashboard.toneClass(dashboard.highestLevel.value));
 const dashboardTone = computed(() => {
@@ -40,9 +41,14 @@ const headStats = computed(() => [
     detail: props.currentUser?.roleLabel || "未登录",
   },
   {
+    label: "我的车辆数",
+    value: String(dashboard.state.vehicles.length || 0),
+    detail: "监控列表仅显示当前账号名下车辆",
+  },
+  {
     label: "当前车辆",
     value: dashboard.state.vehicleId || "--",
-    detail: dashboard.state.vehicleMeta?.plateNumber || "等待选择车辆",
+    detail: dashboard.state.vehicleMeta?.plateNumber || "等待选择本人车辆",
   },
   {
     label: "风险等级",
@@ -71,7 +77,7 @@ onBeforeUnmount(() => {
       <div class="topbar-copy">
         <div class="topbar-intro">
           <h1>冷链运输监控大屏</h1>
-          <p class="topbar-brief">聚焦运输过程中的温控、位置轨迹与风险告警，帮助值守人员快速掌握当前车辆状态。</p>
+          <p class="topbar-brief">聚焦当前登录用户名下车辆的温控、位置轨迹与风险告警，帮助值守人员快速掌握自己的车辆状态。</p>
         </div>
 
         <div class="hero-glance">
@@ -98,15 +104,16 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="meta-card meta-select">
-          <span>车辆</span>
+          <span>我的车辆</span>
           <label class="select-wrap" for="vehicle-select">
             <select
               id="vehicle-select"
               aria-label="选择车辆"
               :value="dashboard.state.vehicleId"
+              :disabled="!hasVehicles"
               @change="dashboard.selectVehicle($event.target.value)"
             >
-              <option v-if="!dashboard.state.vehicles.length" value="">加载中</option>
+              <option v-if="!dashboard.state.vehicles.length" value="">暂无可监控车辆</option>
               <option v-for="vehicle in dashboard.state.vehicles" :key="vehicle.vehicleId" :value="vehicle.vehicleId">
                 {{ vehicle.vehicleId }}
               </option>
@@ -142,32 +149,42 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <SummaryCards :cards="dashboard.summaryCards.value" />
+    <section v-if="!hasVehicles" class="panel empty-card dashboard-empty">
+      <h3>当前账号下暂无可监控车辆</h3>
+      <p>如果你已经分配了车辆，这里会只展示属于你自己的车辆；如果还没有，可以先到“我的车辆”页面查看当前归属情况。</p>
+      <div class="hero-actions">
+        <button class="ghost-button primary" type="button" @click="$emit('open-vehicles')">前往我的车辆</button>
+      </div>
+    </section>
 
-    <main class="dashboard-grid">
-      <RouteMapPanel
-        :trajectory="dashboard.state.trajectory"
-        :active-point="dashboard.activePoint.value"
-        :active-index="dashboard.activeIndex.value"
-        :latest-index="dashboard.latestIndex.value"
-        :replay-active="dashboard.state.replayActive"
-        :route-tone="dashboard.routeTone.value"
-        @toggle-replay="dashboard.toggleReplay()"
-        @set-active-index="dashboard.setActiveIndex"
-      />
+    <template v-else>
+      <SummaryCards :cards="dashboard.summaryCards.value" />
 
-      <TemperaturePanel
-        :history="dashboard.state.history"
-        :active-point="dashboard.activePoint.value"
-        :active-index="dashboard.activeIndex.value"
-        :latest-telemetry="dashboard.state.latestTelemetry"
-        :selected-vehicle="dashboard.state.vehicleMeta"
-        :temperature-tone="dashboard.temperatureTone.value"
-        @focus-latest="dashboard.focusLatest()"
-        @set-active-index="dashboard.setActiveIndex"
-      />
+      <main class="dashboard-grid">
+        <RouteMapPanel
+          :trajectory="dashboard.state.trajectory"
+          :active-point="dashboard.activePoint.value"
+          :active-index="dashboard.activeIndex.value"
+          :latest-index="dashboard.latestIndex.value"
+          :replay-active="dashboard.state.replayActive"
+          :route-tone="dashboard.routeTone.value"
+          @toggle-replay="dashboard.toggleReplay()"
+          @set-active-index="dashboard.setActiveIndex"
+        />
 
-      <AlertsPanel :alerts="dashboard.state.alerts" :alert-count-tone="alertCountTone" :level-label="dashboard.levelLabel" />
-    </main>
+        <TemperaturePanel
+          :history="dashboard.state.history"
+          :active-point="dashboard.activePoint.value"
+          :active-index="dashboard.activeIndex.value"
+          :latest-telemetry="dashboard.state.latestTelemetry"
+          :selected-vehicle="dashboard.state.vehicleMeta"
+          :temperature-tone="dashboard.temperatureTone.value"
+          @focus-latest="dashboard.focusLatest()"
+          @set-active-index="dashboard.setActiveIndex"
+        />
+
+        <AlertsPanel :alerts="dashboard.state.alerts" :alert-count-tone="alertCountTone" :level-label="dashboard.levelLabel" />
+      </main>
+    </template>
   </div>
 </template>

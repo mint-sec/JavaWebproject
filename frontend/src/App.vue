@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import AuthPortal from "./components/AuthPortal.vue";
 import DashboardView from "./components/DashboardView.vue";
 import AdminConsole from "./components/AdminConsole.vue";
+import MyVehiclesView from "./components/MyVehiclesView.vue";
+import MyAlertsView from "./components/MyAlertsView.vue";
 import { getCurrentSession, hasAdminRole, logoutUser, onSessionChanged } from "./services/authService";
 
 let offSessionChange = null;
@@ -11,11 +13,27 @@ const session = ref(getCurrentSession());
 const currentView = ref(resolveView(window.location.hash, session.value));
 
 const canAccessAdmin = computed(() => hasAdminRole(session.value));
+const mainNavItems = computed(() => {
+  return [
+    { id: "dashboard", label: "工作台" },
+    { id: "vehicles", label: "我的车辆" },
+    { id: "alerts", label: "我的告警" },
+  ];
+});
 const shellTitle = computed(() => {
   if (!session.value) {
     return "账号入口";
   }
-  return currentView.value === "admin" ? "后台管理" : "工作台";
+  if (currentView.value === "admin") {
+    return "后台管理";
+  }
+  if (currentView.value === "vehicles") {
+    return "我的车辆";
+  }
+  if (currentView.value === "alerts") {
+    return "我的告警";
+  }
+  return "工作台";
 });
 
 function resolveView(hash, activeSession) {
@@ -27,6 +45,14 @@ function resolveView(hash, activeSession) {
 
   if (normalized === "admin" && hasAdminRole(activeSession)) {
     return "admin";
+  }
+
+  if (normalized === "vehicles") {
+    return "vehicles";
+  }
+
+  if (normalized === "alerts") {
+    return "alerts";
   }
 
   if (normalized === "dashboard") {
@@ -95,21 +121,30 @@ onBeforeUnmount(() => {
 <template>
   <div class="portal-shell">
     <div v-if="session" class="portal-header">
-      <div>
+      <div class="portal-header-main">
         <h2>{{ shellTitle }}</h2>
+        <nav class="portal-nav portal-nav-main" aria-label="主导航">
+          <button
+            v-for="item in mainNavItems"
+            :key="item.id"
+            :class="['portal-nav-item', { active: currentView === item.id }]"
+            type="button"
+            @click="navigate(item.id)"
+          >
+            {{ item.label }}
+          </button>
+        </nav>
       </div>
 
       <div class="portal-actions">
+        <button v-if="canAccessAdmin && currentView !== 'admin'" class="ghost-button" type="button" @click="navigate('admin')">
+          进入后台
+        </button>
         <div class="portal-user">
           <strong>{{ session.displayName }}</strong>
           <span>{{ session.roleLabel }}</span>
         </div>
-        <button v-if="canAccessAdmin && currentView !== 'admin'" class="ghost-button" type="button" @click="navigate('admin')">
-          进入后台
-        </button>
-        <button v-if="currentView !== 'dashboard'" class="ghost-button" type="button" @click="navigate('dashboard')">
-          返回工作台
-        </button>
+
         <button class="ghost-button" type="button" @click="handleLogout">退出登录</button>
       </div>
     </div>
@@ -122,11 +157,16 @@ onBeforeUnmount(() => {
       @open-dashboard="navigate('dashboard')"
     />
 
+    <MyVehiclesView v-else-if="currentView === 'vehicles'" :current-user="session" />
+
+    <MyAlertsView v-else-if="currentView === 'alerts'" :current-user="session" />
+
     <DashboardView
       v-else
       :current-user="session"
       :can-access-admin="canAccessAdmin"
       @open-admin="navigate('admin')"
+      @open-vehicles="navigate('vehicles')"
       @logout="handleLogout"
     />
   </div>

@@ -1,4 +1,5 @@
 import { computed, reactive } from "vue";
+import { listOwnedVehicleIds } from "../services/adminService";
 import { browserMockVehicles, createBrowserMockDashboard } from "./dashboardMock";
 import {
   POLL_INTERVAL_MS,
@@ -20,7 +21,7 @@ import {
   vehicleStatusLabel,
 } from "./dashboardUtils";
 
-export function useDashboard() {
+export function useDashboard(currentUser) {
   const apiBaseFromQuery = new URLSearchParams(window.location.search).get("apiBase");
   const apiBaseCandidates = buildApiBaseCandidates(apiBaseFromQuery);
 
@@ -37,6 +38,7 @@ export function useDashboard() {
     isLoading: false,
     lastSyncAt: null,
     error: "",
+    emptyMessage: "",
     dataSource: "backend",
     apiBase: "",
   });
@@ -70,6 +72,9 @@ export function useDashboard() {
     activePoint.value?.recordTime ? `记录时间 ${activePoint.value.recordTime}` : "记录时间待更新",
   );
   const syncStatus = computed(() => {
+    if (state.emptyMessage) {
+      return "待配置";
+    }
     if (state.error) {
       return "同步异常";
     }
@@ -79,12 +84,18 @@ export function useDashboard() {
     return "准备中";
   });
   const syncDetail = computed(() => {
+    if (state.emptyMessage) {
+      return state.emptyMessage;
+    }
     if (state.error) {
       return buildFetchError({ message: state.error });
     }
     return `最近同步 ${state.lastSyncAt ? formatClock(state.lastSyncAt) : "--:--:--"}`;
   });
   const syncHeadline = computed(() => {
+    if (state.emptyMessage) {
+      return state.emptyMessage;
+    }
     if (state.error) {
       return "数据请求失败，请检查服务连接状态。";
     }
@@ -97,6 +108,9 @@ export function useDashboard() {
     return "等待车辆数据";
   });
   const pollingTone = computed(() => {
+    if (state.emptyMessage) {
+      return "";
+    }
     if (state.error) {
       return "danger";
     }
@@ -106,6 +120,9 @@ export function useDashboard() {
     return toneClass(highestLevel.value);
   });
   const pollingLabel = computed(() => {
+    if (state.emptyMessage) {
+      return "暂无车辆";
+    }
     if (state.error) {
       return "连接异常";
     }
@@ -192,18 +209,30 @@ export function useDashboard() {
   }
 
   async function loadVehicles() {
+    const ownedVehicleIds = new Set(listOwnedVehicleIds(currentUser));
+
     if (state.apiBase === "browser-mock") {
-      state.vehicles = browserMockVehicles;
+      state.vehicles = browserMockVehicles.filter((item) => ownedVehicleIds.has(item.vehicleId));
     } else {
       const response = await fetchJson(`${state.apiBase}/vehicles`);
-      state.vehicles = Array.isArray(response.data) ? response.data.map(normalizeVehicle) : [];
+      const allVehicles = Array.isArray(response.data) ? response.data.map(normalizeVehicle) : [];
+      state.vehicles = allVehicles.filter((item) => ownedVehicleIds.has(item.vehicleId));
       state.dataSource = response.source;
     }
 
     if (!state.vehicles.length) {
-      throw new Error("车辆列表为空，无法初始化页面。");
+      state.vehicleId = "";
+      state.vehicleMeta = null;
+      state.latestTelemetry = null;
+      state.alerts = [];
+      state.history = [];
+      state.trajectory = [];
+      state.chartFocusIndex = null;
+      state.emptyMessage = "当前账号下暂无可监控车辆，请先前往“我的车辆”查看归属车辆。";
+      return;
     }
 
+    state.emptyMessage = "";
     if (!state.vehicleId || !state.vehicles.some((item) => item.vehicleId === state.vehicleId)) {
       state.vehicleId = state.vehicles[0].vehicleId;
     }
@@ -254,6 +283,7 @@ export function useDashboard() {
 
       state.lastSyncAt = new Date();
       state.error = "";
+      state.emptyMessage = "";
 
       if (state.chartFocusIndex == null || !state.replayActive) {
         state.chartFocusIndex = latestIndex.value;

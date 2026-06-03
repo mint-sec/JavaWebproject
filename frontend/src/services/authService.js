@@ -1,3 +1,5 @@
+import { appendLoginLog } from "./auditService";
+
 const USERS_KEY = "coldchain.frontend.auth.users";
 const SESSION_KEY = "coldchain.frontend.auth.session";
 const SESSION_EVENT = "coldchain-session-changed";
@@ -146,6 +148,13 @@ export async function loginUser({ account, password }) {
   await wait();
 
   if (!account || !password) {
+    appendLoginLog({
+      account: String(account || "").trim() || "未输入",
+      roleLabel: "未知",
+      result: "失败",
+      ip: "127.0.0.1",
+      detail: "未填写完整登录信息",
+    });
     throw new Error("请输入用户名和密码。");
   }
 
@@ -154,14 +163,35 @@ export async function loginUser({ account, password }) {
   const user = users.find((item) => item.username.toLowerCase() === normalizedAccount);
 
   if (!user || user.password !== password) {
+    appendLoginLog({
+      account: normalizedAccount,
+      roleLabel: "未知",
+      result: "失败",
+      ip: "127.0.0.1",
+      detail: "用户名或密码错误",
+    });
     throw new Error("用户名或密码错误。");
   }
   if (user.status !== USER_STATUS_ACTIVE) {
+    appendLoginLog({
+      account: user.username,
+      roleLabel: user.role === "ADMIN" ? "管理员" : "普通用户",
+      result: "失败",
+      ip: "127.0.0.1",
+      detail: "账号已被封禁，登录被拒绝",
+    });
     throw new Error("该账号已被封禁，无法登录。");
   }
 
   const session = toSession(user);
   writeSession(session);
+  appendLoginLog({
+    account: user.username,
+    roleLabel: user.role === "ADMIN" ? "管理员" : "普通用户",
+    result: "成功",
+    ip: "127.0.0.1",
+    detail: "登录成功",
+  });
   return session;
 }
 
@@ -214,10 +244,27 @@ export async function registerUser(form) {
 
   const session = toSession(user);
   writeSession(session);
+  appendLoginLog({
+    account: user.username,
+    roleLabel: "普通用户",
+    result: "成功",
+    ip: "127.0.0.1",
+    detail: "注册成功并自动登录",
+  });
   return session;
 }
 
 export function logoutUser() {
+  const currentSession = readJson(SESSION_KEY, null);
   window.localStorage.removeItem(SESSION_KEY);
   notifySessionChanged();
+  if (currentSession) {
+    appendLoginLog({
+      account: currentSession.username,
+      roleLabel: currentSession.roleLabel,
+      result: "退出",
+      ip: "127.0.0.1",
+      detail: "用户主动退出登录",
+    });
+  }
 }

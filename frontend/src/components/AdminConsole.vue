@@ -1,17 +1,10 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 import {
-  createVehicle,
-  deleteVehicle,
   getAdminConsoleData,
-  getAlertLevelOptions,
-  getAlertStatusOptions,
   getUserRoleOptions,
   getUserStatusOptions,
-  getVehicleStatusOptions,
-  updateAlertManagement,
   updateUserManagement,
-  updateVehicle,
 } from "../services/adminService";
 
 const props = defineProps({
@@ -30,48 +23,30 @@ const feedback = reactive({
   type: "",
   text: "",
 });
+const activeLogTab = ref("login");
 
 const menuItems = [
-  { id: "overview", label: "概览", hint: "整体状态" },
+  { id: "overview", label: "平台概览", hint: "平台账号与事项总览" },
   { id: "users", label: "用户管理", hint: "角色与账号状态" },
-  { id: "vehicles", label: "车辆管理", hint: "新增、编辑、删除" },
-  { id: "alerts", label: "告警处理", hint: "指派与处理状态" },
+  { id: "logs", label: "日志中心", hint: "登录日志与操作审计" },
+  { id: "services", label: "服务监控", hint: "前后端与算法链路状态" },
 ];
 
 const userRoleOptions = getUserRoleOptions();
 const userStatusOptions = getUserStatusOptions();
-const vehicleStatusOptions = getVehicleStatusOptions();
-const alertLevelOptions = getAlertLevelOptions();
-const alertStatusOptions = getAlertStatusOptions();
 
 const userDrafts = reactive({});
-const alertDrafts = reactive({});
-const vehicleForm = reactive({
-  vehicleId: "",
-  cargoName: "",
-  status: vehicleStatusOptions[0],
-  driver: "",
-  route: "",
-});
-const editingVehicleId = ref("");
 
 const overviewCards = computed(() => data.value?.overviewCards || []);
+const logCenterCards = computed(() => data.value?.logCenterCards || []);
 const users = computed(() => data.value?.users || []);
-const vehicles = computed(() => data.value?.vehicles || []);
-const alerts = computed(() => data.value?.alerts || []);
+const loginLogs = computed(() => data.value?.loginLogs || []);
+const operationLogs = computed(() => data.value?.operationLogs || []);
+const serviceMonitors = computed(() => data.value?.serviceMonitors || []);
 
 function setFeedback(type, text) {
   feedback.type = type;
   feedback.text = text;
-}
-
-function resetVehicleForm() {
-  vehicleForm.vehicleId = "";
-  vehicleForm.cargoName = "";
-  vehicleForm.status = vehicleStatusOptions[0];
-  vehicleForm.driver = "";
-  vehicleForm.route = "";
-  editingVehicleId.value = "";
 }
 
 function ensureUserDraft(user) {
@@ -82,18 +57,6 @@ function ensureUserDraft(user) {
     };
   }
   return userDrafts[user.id];
-}
-
-function ensureAlertDraft(alert) {
-  if (!alertDrafts[alert.id]) {
-    alertDrafts[alert.id] = {
-      owner: alert.owner,
-      status: alert.status,
-      level: alert.level,
-      note: alert.note || "",
-    };
-  }
-  return alertDrafts[alert.id];
 }
 
 function syncUserDrafts(nextUsers) {
@@ -108,27 +71,12 @@ function syncUserDrafts(nextUsers) {
   });
 }
 
-function syncAlertDrafts(nextAlerts) {
-  Object.keys(alertDrafts).forEach((key) => {
-    delete alertDrafts[key];
-  });
-  nextAlerts.forEach((alert) => {
-    alertDrafts[alert.id] = {
-      owner: alert.owner,
-      status: alert.status,
-      level: alert.level,
-      note: alert.note || "",
-    };
-  });
-}
-
 async function loadConsole() {
   loading.value = true;
   try {
     const nextData = await getAdminConsoleData(props.currentUser);
     data.value = nextData;
     syncUserDrafts(nextData.users || []);
-    syncAlertDrafts(nextData.alerts || []);
   } catch (error) {
     setFeedback("error", error.message || "后台数据加载失败，请稍后重试。");
   } finally {
@@ -142,73 +90,12 @@ async function saveUser(user) {
     await updateUserManagement(user.id, {
       role: draft.role,
       status: draft.status,
-    });
+    }, props.currentUser);
     await loadConsole();
     setFeedback("success", `已更新用户 ${user.username} 的角色和状态。`);
   } catch (error) {
     setFeedback("error", error.message);
   }
-}
-
-function editVehicle(vehicle) {
-  editingVehicleId.value = vehicle.vehicleId;
-  vehicleForm.vehicleId = vehicle.vehicleId;
-  vehicleForm.cargoName = vehicle.cargoName;
-  vehicleForm.status = vehicle.status;
-  vehicleForm.driver = vehicle.driver;
-  vehicleForm.route = vehicle.route;
-  activeSection.value = "vehicles";
-}
-
-async function submitVehicle() {
-  try {
-    if (editingVehicleId.value) {
-      await updateVehicle(editingVehicleId.value, vehicleForm);
-      setFeedback("success", `已更新车辆 ${vehicleForm.vehicleId}。`);
-    } else {
-      await createVehicle(vehicleForm);
-      setFeedback("success", `已新增车辆 ${vehicleForm.vehicleId}。`);
-    }
-    resetVehicleForm();
-    await loadConsole();
-  } catch (error) {
-    setFeedback("error", error.message);
-  }
-}
-
-async function removeVehicle(vehicleId) {
-  const confirmed = window.confirm(`确认删除车辆 ${vehicleId} 吗？`);
-  if (!confirmed) {
-    return;
-  }
-
-  try {
-    await deleteVehicle(vehicleId);
-    if (editingVehicleId.value === vehicleId) {
-      resetVehicleForm();
-    }
-    await loadConsole();
-    setFeedback("success", `已删除车辆 ${vehicleId}。`);
-  } catch (error) {
-    setFeedback("error", error.message);
-  }
-}
-
-async function saveAlert(alert) {
-  const draft = ensureAlertDraft(alert);
-  try {
-    await updateAlertManagement(alert.id, draft);
-    await loadConsole();
-    setFeedback("success", `已更新告警 ${alert.id} 的处理信息。`);
-  } catch (error) {
-    setFeedback("error", error.message);
-  }
-}
-
-async function markAlertHandled(alert) {
-  const draft = ensureAlertDraft(alert);
-  draft.status = "已处理";
-  await saveAlert(alert);
 }
 
 onMounted(() => {
@@ -263,6 +150,10 @@ onMounted(() => {
             <small>{{ card.detail }}</small>
           </article>
         </div>
+        <section class="admin-card admin-note">
+          <h3>职责调整说明</h3>
+          <p>车辆维护和告警处理已迁移到普通用户工作台，管理员后台现在只负责平台账号、角色权限与平台侧事项管理。</p>
+        </section>
       </section>
 
       <section v-else-if="activeSection === 'users'" class="admin-section">
@@ -316,81 +207,92 @@ onMounted(() => {
         </section>
       </section>
 
-      <section v-else-if="activeSection === 'vehicles'" class="admin-section admin-stack">
+      <section v-else-if="activeSection === 'logs'" class="admin-section">
+        <div class="admin-card-grid">
+          <article v-for="card in logCenterCards" :key="card.label" class="admin-metric">
+            <span>{{ card.label }}</span>
+            <strong>{{ card.value }}</strong>
+            <small>{{ card.detail }}</small>
+          </article>
+        </div>
+
         <section class="admin-card">
           <div class="panel-head compact">
             <div>
-              <h3>{{ editingVehicleId ? "编辑车辆" : "新增车辆" }}</h3>
+              <h3>日志中心</h3>
             </div>
           </div>
 
-          <div class="admin-form-grid">
-            <label class="admin-field">
-              <span>车辆编号</span>
-              <input v-model.trim="vehicleForm.vehicleId" class="admin-input" type="text" placeholder="例如 CC-VA-08" />
-            </label>
-            <label class="admin-field">
-              <span>货物类型</span>
-              <input v-model.trim="vehicleForm.cargoName" class="admin-input" type="text" placeholder="例如 疫苗" />
-            </label>
-            <label class="admin-field">
-              <span>车辆状态</span>
-              <select v-model="vehicleForm.status" class="admin-select">
-                <option v-for="status in vehicleStatusOptions" :key="status" :value="status">{{ status }}</option>
-              </select>
-            </label>
-            <label class="admin-field">
-              <span>司机</span>
-              <input v-model.trim="vehicleForm.driver" class="admin-input" type="text" placeholder="请输入司机姓名" />
-            </label>
-            <label class="admin-field admin-field-wide">
-              <span>路线</span>
-              <input v-model.trim="vehicleForm.route" class="admin-input" type="text" placeholder="例如 北京仓库 -> 区域医院" />
-            </label>
-          </div>
-
-          <div class="admin-inline-actions">
-            <button class="ghost-button primary" type="button" @click="submitVehicle">
-              {{ editingVehicleId ? "保存修改" : "新增车辆" }}
+          <div class="admin-tabs">
+            <button
+              :class="['admin-tab', { active: activeLogTab === 'login' }]"
+              type="button"
+              @click="activeLogTab = 'login'"
+            >
+              登录日志
             </button>
-            <button v-if="editingVehicleId" class="ghost-button" type="button" @click="resetVehicleForm">取消编辑</button>
+            <button
+              :class="['admin-tab', { active: activeLogTab === 'operation' }]"
+              type="button"
+              @click="activeLogTab = 'operation'"
+            >
+              操作日志
+            </button>
           </div>
-        </section>
 
-        <section class="admin-card">
-          <div class="panel-head compact">
-            <div>
-              <h3>车辆列表</h3>
-            </div>
-          </div>
-          <div class="table-wrap">
+          <div v-if="activeLogTab === 'login'" class="table-wrap">
             <table class="admin-table">
               <thead>
                 <tr>
-                  <th>车辆编号</th>
-                  <th>货物类型</th>
-                  <th>状态</th>
-                  <th>司机</th>
-                  <th>路线</th>
-                  <th>最近更新</th>
-                  <th>操作</th>
+                  <th>时间</th>
+                  <th>账号</th>
+                  <th>角色</th>
+                  <th>结果</th>
+                  <th>来源</th>
+                  <th>说明</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="vehicle in vehicles" :key="vehicle.vehicleId">
-                  <td>{{ vehicle.vehicleId }}</td>
-                  <td>{{ vehicle.cargoName }}</td>
-                  <td>{{ vehicle.status }}</td>
-                  <td>{{ vehicle.driver }}</td>
-                  <td>{{ vehicle.route }}</td>
-                  <td>{{ vehicle.updatedAt }}</td>
-                  <td class="admin-actions-cell">
-                    <button class="table-action" type="button" @click="editVehicle(vehicle)">编辑</button>
-                    <button class="table-action danger" type="button" @click="removeVehicle(vehicle.vehicleId)">删除</button>
-                  </td>
+                <tr v-for="log in loginLogs" :key="log.id">
+                  <td>{{ log.time }}</td>
+                  <td>{{ log.account }}</td>
+                  <td>{{ log.roleLabel }}</td>
+                  <td>{{ log.result }}</td>
+                  <td>{{ log.ip }}</td>
+                  <td>{{ log.detail }}</td>
                 </tr>
-                <tr v-if="!vehicles.length">
-                  <td colspan="7">暂无车辆数据，可先新增车辆。</td>
+                <tr v-if="!loginLogs.length">
+                  <td colspan="6">暂无登录日志</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div v-else class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>模块</th>
+                  <th>动作</th>
+                  <th>操作人</th>
+                  <th>目标对象</th>
+                  <th>结果</th>
+                  <th>说明</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="log in operationLogs" :key="log.id">
+                  <td>{{ log.time }}</td>
+                  <td>{{ log.module }}</td>
+                  <td>{{ log.action }}</td>
+                  <td>{{ log.operator }}</td>
+                  <td>{{ log.target }}</td>
+                  <td>{{ log.result }}</td>
+                  <td>{{ log.detail }}</td>
+                </tr>
+                <tr v-if="!operationLogs.length">
+                  <td colspan="7">暂无操作日志</td>
                 </tr>
               </tbody>
             </table>
@@ -398,51 +300,34 @@ onMounted(() => {
         </section>
       </section>
 
-      <section v-else-if="activeSection === 'alerts'" class="admin-section">
-        <div v-if="alerts.length" class="admin-alerts-grid">
-          <article v-for="alert in alerts" :key="alert.id" :class="['admin-alert-card', alert.level.toLowerCase()]">
-            <div class="admin-alert-head">
+      <section v-else-if="activeSection === 'services'" class="admin-section">
+        <section class="admin-card admin-note">
+          <h3>服务监控</h3>
+          <p>这里用于集中查看前端、后端、算法和数据库链路的状态。当前为前端预留版，后续可以直接接健康检查接口与链路监控接口。</p>
+        </section>
+
+        <div class="service-grid">
+          <article v-for="service in serviceMonitors" :key="service.id" class="service-card">
+            <div class="service-card-head">
               <div>
-                <strong>{{ alert.title }}</strong>
-                <small>{{ alert.vehicleId }}</small>
+                <strong>{{ service.name }}</strong>
+                <small>{{ service.source }}</small>
               </div>
-              <span class="alert-level">{{ alert.levelLabel }}</span>
+              <span :class="['status-pill', service.tone]">{{ service.status }}</span>
             </div>
 
-            <p>{{ alert.detail }}</p>
+            <p>{{ service.detail }}</p>
 
-            <div class="admin-form-grid compact">
-              <label class="admin-field">
-                <span>处理人</span>
-                <input v-model.trim="ensureAlertDraft(alert).owner" class="admin-input" type="text" />
-              </label>
-              <label class="admin-field">
-                <span>优先级</span>
-                <select v-model="ensureAlertDraft(alert).level" class="admin-select">
-                  <option v-for="item in alertLevelOptions" :key="item" :value="item">{{ item }}</option>
-                </select>
-              </label>
-              <label class="admin-field">
-                <span>处理状态</span>
-                <select v-model="ensureAlertDraft(alert).status" class="admin-select">
-                  <option v-for="item in alertStatusOptions" :key="item" :value="item">{{ item }}</option>
-                </select>
-              </label>
-              <label class="admin-field admin-field-wide">
-                <span>处理备注</span>
-                <textarea v-model.trim="ensureAlertDraft(alert).note" class="admin-textarea" rows="3"></textarea>
-              </label>
+            <div class="service-meta">
+              <span>响应耗时</span>
+              <strong>{{ service.latency }}</strong>
             </div>
-
-            <div class="admin-inline-actions">
-              <button class="table-action" type="button" @click="saveAlert(alert)">保存处理结果</button>
-              <button class="table-action success" type="button" @click="markAlertHandled(alert)">标记为已处理</button>
+            <div class="service-meta">
+              <span>最近检查</span>
+              <strong>{{ service.checkedAt }}</strong>
             </div>
           </article>
         </div>
-        <section v-else class="admin-card">
-          <p>当前没有待处理告警。</p>
-        </section>
       </section>
     </main>
   </section>
