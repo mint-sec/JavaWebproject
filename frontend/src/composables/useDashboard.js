@@ -52,9 +52,13 @@ export function useDashboard() {
     }
     return state.history[activeIndex.value] || state.history[latestIndex.value];
   });
-  const highestLevel = computed(() => (state.alerts.length ? getHighestAlertLevel(state.alerts) : deriveRiskLevel(state.vehicleMeta, state.latestTelemetry)));
+  const highestLevel = computed(() =>
+    state.alerts.length ? getHighestAlertLevel(state.alerts) : deriveRiskLevel(state.vehicleMeta, state.latestTelemetry),
+  );
   const mockSource = computed(() => state.dataSource === "mock" || state.dataSource === "browser-mock");
-  const sceneLabel = computed(() => (state.vehicleMeta?.cargoName ? `${state.vehicleMeta.cargoName}冷链配送` : "疫苗冷链配送"));
+  const sceneLabel = computed(() =>
+    state.vehicleMeta?.cargoName ? `${state.vehicleMeta.cargoName}冷链运输` : "疫苗冷链运输",
+  );
   const vehicleMetaLabel = computed(() => {
     if (!state.vehicleMeta) {
       return "等待载入车辆信息...";
@@ -62,34 +66,30 @@ export function useDashboard() {
     return `${state.vehicleMeta.plateNumber} · ${vehicleStatusLabel(state.vehicleMeta.status)} · ${state.vehicleMeta.cargoName}`;
   });
   const systemTimeLabel = computed(() => activePoint.value?.recordTime?.split(" ")[1] || "--:--:--");
-  const recordTimeLabel = computed(() => (activePoint.value?.recordTime ? `后端记录时间 ${activePoint.value.recordTime}` : "后端时间待同步"));
+  const recordTimeLabel = computed(() =>
+    activePoint.value?.recordTime ? `记录时间 ${activePoint.value.recordTime}` : "记录时间待更新",
+  );
   const syncStatus = computed(() => {
     if (state.error) {
       return "同步异常";
     }
-    if (mockSource.value) {
-      return "模拟数据中";
-    }
     if (state.lastSyncAt) {
-      return "接口已连接";
+      return "运行中";
     }
-    return "准备连接";
+    return "准备中";
   });
   const syncDetail = computed(() => {
     if (state.error) {
       return buildFetchError({ message: state.error });
     }
-    return `${mockSource.value ? "数据来源 前端本地 mock 兜底" : "数据来源 后端接口"} · 接口基址 ${state.apiBase || "待探测"} · 最近同步 ${state.lastSyncAt ? formatClock(state.lastSyncAt) : "--:--:--"}`;
+    return `最近同步 ${state.lastSyncAt ? formatClock(state.lastSyncAt) : "--:--:--"}`;
   });
   const syncHeadline = computed(() => {
     if (state.error) {
-      return "接口请求失败，请检查 Vite 代理或后端服务";
+      return "数据请求失败，请检查服务连接状态。";
     }
     if (state.isLoading) {
-      return "正在拉取最新数据...";
-    }
-    if (mockSource.value) {
-      return "当前为前端本地 mock 兜底，字段结构已对齐后端接口";
+      return "正在更新最新监控数据...";
     }
     if (state.vehicleMeta) {
       return `${state.vehicleMeta.vehicleId} 当前风险 ${levelLabel(highestLevel.value)}`;
@@ -125,7 +125,7 @@ export function useDashboard() {
       {
         label: "当前温度",
         value: `${state.latestTelemetry.temperature.toFixed(1)}°C`,
-        extra: state.latestTelemetry.trend || "温度趋势待分析",
+        extra: state.latestTelemetry.trend || "温度趋势更新中",
         tone: riskTone,
       },
       {

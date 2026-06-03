@@ -140,7 +140,7 @@ const chartData = computed(() => {
         <small>
           {{
             activePoint
-              ? `湿度 ${formatNumber(activePoint.humidity)}% · 速度 ${formatNumber(activePoint.speed)} km/h · ${activePoint.doorOpen ? "车门开启中" : "车门已关闭"} · 后端记录 ${activePoint.recordTime}`
+              ? `湿度 ${formatNumber(activePoint.humidity)}% · 速度 ${formatNumber(activePoint.speed)} km/h · ${activePoint.doorOpen ? "车门开启中" : "车门已关闭"} · 记录时间 ${activePoint.recordTime}`
               : "点击折线中的采样点，可联动查看该时刻的车辆位置和运行指标。"
           }}
         </small>

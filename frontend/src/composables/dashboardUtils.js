@@ -65,7 +65,11 @@ export function deriveRiskLevel(vehicle, telemetry) {
   if (telemetry.temperature >= vehicle.safeTempMax || telemetry.temperature <= vehicle.safeTempMin) {
     return "HIGH";
   }
-  if (telemetry.temperature >= vehicle.safeTempMax - 0.6 || telemetry.temperature <= vehicle.safeTempMin + 0.6 || telemetry.doorOpen) {
+  if (
+    telemetry.temperature >= vehicle.safeTempMax - 0.6 ||
+    telemetry.temperature <= vehicle.safeTempMin + 0.6 ||
+    telemetry.doorOpen
+  ) {
     return "MEDIUM";
   }
   return "LOW";
@@ -116,7 +120,7 @@ export function normalizeHistoryPoint(item, fallback = {}) {
     lng: Number(item.lng ?? fallback.lng) || 0,
     lat: Number(item.lat ?? fallback.lat) || 0,
     remainingKm: Number(item.remainingKm ?? fallback.remainingKm) || 0,
-    trend: item.trend || fallback.trend || "娓╁害骞崇ǔ",
+    trend: item.trend || fallback.trend || "状态更新中",
   };
 }
 
@@ -198,7 +202,7 @@ export function buildApiBaseCandidates(apiBaseFromQuery) {
 
 export function buildFetchError(error) {
   if (String(error.message || "").includes("Failed to fetch")) {
-    return "请求被浏览器拦截或后端未启动。请优先用 Vite 开发服务器访问 http://localhost:18080。";
+    return "无法连接到服务，请稍后重试。";
   }
-  return error.message || "接口请求失败。";
+  return error.message || "数据请求失败。";
 }

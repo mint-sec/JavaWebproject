@@ -16,7 +16,11 @@ const emit = defineEmits(["toggle-replay", "set-active-index"]);
 const mappedPoints = computed(() => mapTrajectoryToCanvas(props.trajectory));
 const routePath = computed(() => mappedPoints.value.map((point) => `${point.x},${point.y}`).join(" "));
 const latestPoint = computed(() => mappedPoints.value[props.latestIndex] || null);
-const replayLabel = computed(() => (props.latestIndex <= 0 ? "至少需要 2 个采样点才能回放" : `当前第 ${props.activeIndex + 1} / ${props.latestIndex + 1} 个采样点`));
+const replayLabel = computed(() =>
+  props.latestIndex <= 0
+    ? "至少需要 2 个采样点才能回放"
+    : `当前第 ${props.activeIndex + 1} / ${props.latestIndex + 1} 个采样点`,
+);
 </script>
 
 <template>
@@ -26,7 +30,9 @@ const replayLabel = computed(() => (props.latestIndex <= 0 ? "至少需要 2 个
         <p class="panel-kicker">地图轨迹区域</p>
         <h2>车辆轨迹与位置回放</h2>
       </div>
-      <span class="pill" :class="routeTone">{{ replayActive ? `回放中 ${activeIndex + 1}/${Math.max(trajectory.length, 1)}` : trajectory.length ? `已采样 ${trajectory.length} 次` : "等待采样" }}</span>
+      <span class="pill" :class="routeTone">
+        {{ replayActive ? `回放中 ${activeIndex + 1}/${Math.max(trajectory.length, 1)}` : trajectory.length ? `已采样 ${trajectory.length} 次` : "等待采样" }}
+      </span>
     </div>
 
     <div class="map-stage">
@@ -82,7 +88,7 @@ const replayLabel = computed(() => (props.latestIndex <= 0 ? "至少需要 2 个
           </text>
         </g>
 
-        <text x="24" y="32" fill="#88a5b0" font-size="13">当前视图为经纬度轨迹投影，适用于实时监控与轨迹回放演示。</text>
+        <text x="24" y="32" fill="#88a5b0" font-size="13">当前视图展示车辆经纬度轨迹，可用于位置跟踪与回放查看。</text>
       </svg>
 
       <svg v-else viewBox="0 0 720 380" aria-label="车辆轨迹视图">
