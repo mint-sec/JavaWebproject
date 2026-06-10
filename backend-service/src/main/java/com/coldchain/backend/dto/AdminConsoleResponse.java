@@ -4,9 +4,11 @@ import java.util.List;
 
 public record AdminConsoleResponse(
         List<OverviewCard> overviewCards,
+        List<OverviewCard> logCenterCards,
         List<UserResponse> users,
-        List<AdminVehicleResponse> vehicles,
-        List<AdminAlertResponse> alerts) {
+        List<LoginLogResponse> loginLogs,
+        List<OperationLogResponse> operationLogs,
+        List<ServiceMonitorResponse> serviceMonitors) {
 
     public record OverviewCard(String label, String value, String detail) {
     }

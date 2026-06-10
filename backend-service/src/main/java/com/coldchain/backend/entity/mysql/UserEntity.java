@@ -13,7 +13,8 @@ import java.time.LocalDateTime;
 public class UserEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long pk;
+    @Column(name = "id")
+    private Long id;
 
     @Column(name = "user_id", nullable = false, unique = true, length = 32)
     private String userId;
@@ -45,7 +46,13 @@ public class UserEntity {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    public Long getPk() { return pk; }
+    @Column(name = "login_failure_count", nullable = false)
+    private int loginFailureCount;
+
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
+
+    public Long getId() { return id; }
 
     public String getUserId() { return userId; }
     public void setUserId(String userId) { this.userId = userId; }
@@ -76,4 +83,10 @@ public class UserEntity {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public int getLoginFailureCount() { return loginFailureCount; }
+    public void setLoginFailureCount(int loginFailureCount) { this.loginFailureCount = loginFailureCount; }
+
+    public LocalDateTime getLockedUntil() { return lockedUntil; }
+    public void setLockedUntil(LocalDateTime lockedUntil) { this.lockedUntil = lockedUntil; }
 }

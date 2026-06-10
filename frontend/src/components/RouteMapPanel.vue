@@ -7,28 +7,73 @@ const props = defineProps({
   activePoint: { type: Object, default: null },
   activeIndex: { type: Number, required: true },
   latestIndex: { type: Number, required: true },
+  followLatest: { type: Boolean, required: true },
   replayActive: { type: Boolean, required: true },
   routeTone: { type: String, default: "" },
 });
 
-const emit = defineEmits(["toggle-replay", "set-active-index"]);
+const emit = defineEmits(["focus-latest", "toggle-replay", "set-active-index"]);
 
 const mappedPoints = computed(() => mapTrajectoryToCanvas(props.trajectory));
 const routePath = computed(() => mappedPoints.value.map((point) => `${point.x},${point.y}`).join(" "));
 const latestPoint = computed(() => mappedPoints.value[props.latestIndex] || null);
-const replayLabel = computed(() =>
-  props.latestIndex <= 0
-    ? "至少需要 2 个采样点才能回放"
-    : `当前第 ${props.activeIndex + 1} / ${props.latestIndex + 1} 个采样点`,
-);
+
+const replayLabel = computed(() => {
+  if (props.latestIndex <= 0) {
+    return "至少需要 2 个采样点才能回放";
+  }
+  if (props.replayActive) {
+    return `回放中：第 ${props.activeIndex + 1} / ${props.latestIndex + 1} 个采样点`;
+  }
+  if (props.followLatest) {
+    return `实时跟随最新采样，共 ${props.latestIndex + 1} 个点`;
+  }
+  return `手动查看第 ${props.activeIndex + 1} / ${props.latestIndex + 1} 个采样点`;
+});
+
+const latestMarker = computed(() => {
+  if (!latestPoint.value) {
+    return null;
+  }
+  return buildLabel(latestPoint.value, "最新位置");
+});
+
+const activeMarker = computed(() => {
+  const point = mappedPoints.value[props.activeIndex];
+  if (!point || !props.activePoint) {
+    return null;
+  }
+  return buildLabel(point, props.activePoint.sampleTime || "当前查看", true);
+});
+
+function buildLabel(point, text, preferAbove = false) {
+  const canvasWidth = 720;
+  const horizontalOffset = point.x > canvasWidth - 150 ? -16 : 16;
+  const anchor = horizontalOffset < 0 ? "end" : "start";
+  let y = point.y + (preferAbove ? -14 : 5);
+
+  if (preferAbove && point.y < 36) {
+    y = point.y + 24;
+  }
+  if (!preferAbove && point.y > 350) {
+    y = point.y - 14;
+  }
+
+  return {
+    text,
+    x: point.x + horizontalOffset,
+    y,
+    anchor,
+  };
+}
 </script>
 
 <template>
   <section class="panel panel-map">
     <div class="panel-head">
       <div>
-        <p class="panel-kicker">地图轨迹区域</p>
-        <h2>车辆轨迹与位置回放</h2>
+        <p class="panel-kicker">轨迹区域</p>
+        <h2>车辆轨迹与采样回看</h2>
       </div>
       <span class="pill" :class="routeTone">
         {{ replayActive ? `回放中 ${activeIndex + 1}/${Math.max(trajectory.length, 1)}` : trajectory.length ? `已采样 ${trajectory.length} 次` : "等待采样" }}
@@ -64,7 +109,7 @@ const replayLabel = computed(() =>
         <polyline :points="routePath" fill="none" stroke="url(#trajectoryGlow)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.18" />
         <polyline :points="routePath" fill="none" stroke="url(#trajectoryGlow)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
 
-        <g v-for="(point, index) in mappedPoints" :key="`${point.sampleTime}-${index}`">
+        <g v-for="(point, index) in mappedPoints" :key="`${point.recordTime}-${index}`">
           <circle
             :cx="point.x"
             :cy="point.y"
@@ -74,21 +119,23 @@ const replayLabel = computed(() =>
           />
         </g>
 
-        <g v-if="latestPoint">
+        <g v-if="latestPoint && latestMarker">
           <circle :cx="latestPoint.x" :cy="latestPoint.y" r="18" fill="rgba(36,215,173,0.2)" />
           <circle :cx="latestPoint.x" :cy="latestPoint.y" r="10" fill="#24d7ad" filter="url(#traceGlow)" />
-          <text :x="latestPoint.x + 16" :y="latestPoint.y + 5" fill="#eff7fa" font-size="14">最新位置</text>
-        </g>
-
-        <g v-if="mappedPoints[activeIndex]">
-          <circle :cx="mappedPoints[activeIndex].x" :cy="mappedPoints[activeIndex].y" r="14" fill="rgba(255,191,90,0.18)" />
-          <circle :cx="mappedPoints[activeIndex].x" :cy="mappedPoints[activeIndex].y" r="8" fill="#ffbf5a" />
-          <text :x="mappedPoints[activeIndex].x + 16" :y="mappedPoints[activeIndex].y - 12" fill="#ffddb0" font-size="14">
-            {{ activePoint.sampleTime }}
+          <text :x="latestMarker.x" :y="latestMarker.y" :text-anchor="latestMarker.anchor" fill="#eff7fa" font-size="14">
+            {{ latestMarker.text }}
           </text>
         </g>
 
-        <text x="24" y="32" fill="#88a5b0" font-size="13">当前视图展示车辆经纬度轨迹，可用于位置跟踪与回放查看。</text>
+        <g v-if="mappedPoints[activeIndex] && activeMarker">
+          <circle :cx="mappedPoints[activeIndex].x" :cy="mappedPoints[activeIndex].y" r="14" fill="rgba(255,191,90,0.18)" />
+          <circle :cx="mappedPoints[activeIndex].x" :cy="mappedPoints[activeIndex].y" r="8" fill="#ffbf5a" />
+          <text :x="activeMarker.x" :y="activeMarker.y" :text-anchor="activeMarker.anchor" fill="#ffddb0" font-size="14">
+            {{ activeMarker.text }}
+          </text>
+        </g>
+
+        <text x="24" y="32" fill="#88a5b0" font-size="13">轨迹会持续叠加采样点，手动查看历史时不会因轮询而自动跳回最新位置。</text>
       </svg>
 
       <svg v-else viewBox="0 0 720 380" aria-label="车辆轨迹视图">
@@ -99,7 +146,7 @@ const replayLabel = computed(() =>
       <div class="map-legend">
         <span><i class="legend-dot trail"></i>轨迹历史</span>
         <span><i class="legend-dot latest"></i>最新采样</span>
-        <span><i class="legend-dot replay"></i>回放定位</span>
+        <span><i class="legend-dot replay"></i>当前查看</span>
       </div>
     </div>
 
@@ -107,6 +154,7 @@ const replayLabel = computed(() =>
       <button class="ghost-button" type="button" :disabled="latestIndex <= 0" @click="emit('toggle-replay')">
         {{ replayActive ? "停止回放" : "回放轨迹" }}
       </button>
+      <button class="ghost-button" type="button" :disabled="followLatest || !trajectory.length" @click="emit('focus-latest')">回到最新</button>
       <input
         type="range"
         :min="0"
@@ -128,8 +176,8 @@ const replayLabel = computed(() =>
         <strong>{{ activePoint ? `${formatNumber(activePoint.remainingKm)} km` : "--" }}</strong>
       </div>
       <div>
-        <span>回放状态</span>
-        <strong>{{ replayActive ? `查看第 ${activeIndex + 1} 个采样点` : "定位在最新采样" }}</strong>
+        <span>查看模式</span>
+        <strong>{{ replayActive ? "轨迹回放中" : followLatest ? "跟随最新采样" : "手动查看历史" }}</strong>
       </div>
     </div>
   </section>

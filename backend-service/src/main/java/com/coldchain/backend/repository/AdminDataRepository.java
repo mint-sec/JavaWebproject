@@ -44,14 +44,16 @@ public class AdminDataRepository {
         if (dataSourceModeProperties.useMysql()) {
             return userJpaRepository.orElseThrow().findByUsername(username).map(this::toUserRecord);
         }
-        return users.stream().filter(u -> u.username().equals(username)).findFirst();
+        return users.stream()
+                .filter(u -> u.username().equalsIgnoreCase(username))
+                .findFirst();
     }
 
     public boolean existsByUsername(String username) {
         if (dataSourceModeProperties.useMysql()) {
             return userJpaRepository.orElseThrow().existsByUsername(username);
         }
-        return users.stream().anyMatch(u -> u.username().equals(username));
+        return users.stream().anyMatch(u -> u.username().equalsIgnoreCase(username));
     }
 
     public boolean existsByPhone(String phone) {
@@ -65,7 +67,7 @@ public class AdminDataRepository {
         if (dataSourceModeProperties.useMysql()) {
             return userJpaRepository.orElseThrow().existsByEmail(email);
         }
-        return users.stream().anyMatch(u -> u.email().equals(email));
+        return users.stream().anyMatch(u -> u.email().equalsIgnoreCase(email));
     }
 
     public UserRecord saveUser(UserRecord user) {
@@ -98,51 +100,37 @@ public class AdminDataRepository {
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
         users.add(new UserRecord("USR-ADMIN-001", "admin", "admin", "13800000001",
                 "admin@coldchain.local", encoder.encode("Admin123!"),
-                "ADMIN", "启用中", "系统账号", now));
+                "ADMIN", "启用中", "系统账号", now, 0, null));
         users.add(new UserRecord("USR-OPS-001", "operator", "operator", "13800000002",
-                "operator@coldchain.local", encoder.encode("password123"),
-                "USER", "启用中", "系统账号", now));
-        String encoded = encoder.encode("123456");
-        users.add(new UserRecord("USR-202606030001", "zhangsan", "zhangsan", "13800000003",
-                "zhangsan@example.com", encoded, "USER", "启用中", "用户注册", now));
-        users.add(new UserRecord("USR-202606030002", "lisi", "lisi", "13800000004",
-                "lisi@example.com", encoded, "USER", "启用中", "用户注册", now));
-        users.add(new UserRecord("USR-202606030003", "wangwu", "wangwu", "13800000005",
-                "wangwu@example.com", encoded, "USER", "启用中", "用户注册", now));
-        users.add(new UserRecord("USR-202606030004", "zhaoliu", "zhaoliu", "13800000006",
-                "zhaoliu@example.com", encoded, "USER", "已封禁", "用户注册", now));
-        users.add(new UserRecord("USR-202606030005", "sunqi", "sunqi", "13800000007",
-                "sunqi@example.com", encoded, "USER", "启用中", "用户注册", now));
-        users.add(new UserRecord("USR-202606030006", "zhouba", "zhouba", "13800000008",
-                "zhouba@example.com", encoded, "USER", "启用中", "用户注册", now));
-        users.add(new UserRecord("USR-202606030007", "wujiu", "wujiu", "13800000009",
-                "wujiu@example.com", encoded, "USER", "启用中", "用户注册", now));
-        users.add(new UserRecord("USR-202606030008", "zhengshi", "zhengshi", "13800000010",
-                "zhengshi@example.com", encoded, "USER", "启用中", "用户注册", now));
+                "operator@coldchain.local", encoder.encode("Operator123!"),
+                "USER", "启用中", "系统账号", now, 0, null));
     }
 
-    private UserRecord toUserRecord(UserEntity e) {
-        return new UserRecord(e.getUserId(), e.getUsername(), e.getDisplayName(),
-                e.getPhone(), e.getEmail(), e.getPassword(), e.getRole(),
-                e.getStatus(), e.getOrigin(), e.getCreatedAt());
+    private UserRecord toUserRecord(UserEntity entity) {
+        return new UserRecord(entity.getUserId(), entity.getUsername(), entity.getDisplayName(),
+                entity.getPhone(), entity.getEmail(), entity.getPassword(), entity.getRole(),
+                entity.getStatus(), entity.getOrigin(), entity.getCreatedAt(),
+                entity.getLoginFailureCount(), entity.getLockedUntil());
     }
 
-    private UserEntity toUserEntity(UserRecord r) {
-        UserEntity e = new UserEntity();
-        applyUserToEntity(r, e);
-        return e;
+    private UserEntity toUserEntity(UserRecord record) {
+        UserEntity entity = new UserEntity();
+        applyUserToEntity(record, entity);
+        return entity;
     }
 
-    private void applyUserToEntity(UserRecord r, UserEntity e) {
-        e.setUserId(r.id());
-        e.setUsername(r.username());
-        e.setDisplayName(r.displayName());
-        e.setPhone(r.phone());
-        e.setEmail(r.email());
-        e.setPassword(r.password());
-        e.setRole(r.role());
-        e.setStatus(r.status());
-        e.setOrigin(r.origin());
-        e.setCreatedAt(r.createdAt());
+    private void applyUserToEntity(UserRecord record, UserEntity entity) {
+        entity.setUserId(record.id());
+        entity.setUsername(record.username());
+        entity.setDisplayName(record.displayName());
+        entity.setPhone(record.phone());
+        entity.setEmail(record.email());
+        entity.setPassword(record.password());
+        entity.setRole(record.role());
+        entity.setStatus(record.status());
+        entity.setOrigin(record.origin());
+        entity.setCreatedAt(record.createdAt());
+        entity.setLoginFailureCount(record.loginFailureCount());
+        entity.setLockedUntil(record.lockedUntil());
     }
 }

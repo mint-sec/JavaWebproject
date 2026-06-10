@@ -3,6 +3,7 @@ package com.coldchain.backend.controller;
 import com.coldchain.backend.dto.ApiResponse;
 import com.coldchain.backend.dto.DashboardResponse;
 import com.coldchain.backend.service.DashboardService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,7 +19,7 @@ public class DashboardController {
     }
 
     @GetMapping("/vehicles/{vehicleCode}")
-    public ApiResponse<DashboardResponse> getVehicleDashboard(@PathVariable String vehicleCode) {
-        return ApiResponse.ok(dashboardService.getVehicleDashboard(vehicleCode));
+    public ApiResponse<DashboardResponse> getVehicleDashboard(@PathVariable String vehicleCode, HttpServletRequest request) {
+        return ApiResponse.ok(dashboardService.getVehicleDashboard((String) request.getAttribute("userId"), vehicleCode));
     }
 }

@@ -1,5 +1,5 @@
 export const POLL_INTERVAL_MS = 5000;
-export const MAX_HISTORY = 12;
+export const MAX_HISTORY = 60;
 export const MAX_ALERTS = 4;
 export const levelPriority = { LOW: 0, MEDIUM: 1, HIGH: 2 };
 
@@ -37,7 +37,10 @@ export function vehicleStatusLabel(status) {
     return "待命中";
   }
   if (status === "OFFLINE") {
-    return "离线";
+    return "已停用";
+  }
+  if (status === "MAINTENANCE") {
+    return "维修中";
   }
   return status || "未知";
 }
@@ -50,8 +53,26 @@ export function formatClock(date) {
   return value.toLocaleTimeString("zh-CN", { hour12: false });
 }
 
+export function formatDateTime(date) {
+  const value = typeof date === "string" ? new Date(date.replace(/-/g, "/")) : date;
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+    return "--";
+  }
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  const hours = String(value.getHours()).padStart(2, "0");
+  const minutes = String(value.getMinutes()).padStart(2, "0");
+  const seconds = String(value.getSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
 export function formatNumber(value, digits = 1) {
-  return Number(value).toFixed(digits).replace(/\.0$/, "");
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return "--";
+  }
+  return numeric.toFixed(digits).replace(/\.0$/, "");
 }
 
 export function clamp(value, min, max) {
@@ -88,14 +109,18 @@ export function getHighestAlertLevel(alerts) {
 export function normalizeVehicle(item) {
   return {
     ...item,
-    vehicleId: item.vehicleId || item.vehicleCode || "",
+    vehicleKey: item.vehicleKey || item.vehicleCode || item.vehicleId || "",
+    vehicleId: item.vehicleId || item.displayCode || item.vehicleCode || "",
+    routeDistanceKm: Number(item.routeDistanceKm) || 0,
+    safeTempMin: Number(item.safeTempMin) || 0,
+    safeTempMax: Number(item.safeTempMax) || 0,
   };
 }
 
 export function normalizeTelemetry(item) {
   return {
     vehicleId: item.vehicleId || item.vehicleCode || "",
-    recordTime: item.recordTime,
+    recordTime: item.recordTime || "",
     temperature: Number(item.temperature) || 0,
     humidity: Number(item.humidity) || 0,
     doorOpen: Boolean(item.doorOpen),
@@ -109,9 +134,10 @@ export function normalizeTelemetry(item) {
 }
 
 export function normalizeHistoryPoint(item, fallback = {}) {
+  const recordTime = item.recordTime || fallback.recordTime || "";
   return {
-    sampleTime: item.sampleTime || item.time || item.recordTime?.split(" ")[1] || "--:--",
-    recordTime: item.recordTime || fallback.recordTime || "",
+    sampleTime: item.sampleTime || item.time || recordTime.split(" ")[1] || "--:--:--",
+    recordTime,
     temperature: Number(item.temperature ?? fallback.temperature) || 0,
     humidity: Number(item.humidity ?? fallback.humidity) || 0,
     doorOpen: Boolean(item.doorOpen ?? fallback.doorOpen),
@@ -138,9 +164,7 @@ export function buildDashboardHistory(items, latestTelemetry, route) {
 
   return historyItems.map((item, index) => {
     const routeIndex =
-      routePoints.length > 1
-        ? Math.round((index / Math.max(historyItems.length - 1, 1)) * (routePoints.length - 1))
-        : 0;
+      routePoints.length > 1 ? Math.round((index / Math.max(historyItems.length - 1, 1)) * (routePoints.length - 1)) : 0;
     const routePoint = routePoints[routeIndex] || fallbackPoint;
     return normalizeHistoryPoint(item, {
       ...latestTelemetry,
@@ -160,6 +184,10 @@ export function normalizeAlerts(items) {
 }
 
 export function mapTrajectoryToCanvas(points) {
+  if (!points.length) {
+    return [];
+  }
+
   const width = 720;
   const height = 380;
   const padding = 60;
@@ -188,13 +216,13 @@ export function buildApiBaseCandidates(apiBaseFromQuery) {
   const isDirectStaticPreview = ["63342", "5500"].includes(window.location.port);
 
   if (window.location.protocol === "file:") {
-    candidates.push("http://localhost:18080/api/v1");
+    candidates.push("http://localhost:18081/api/v1");
   } else if (isDirectStaticPreview) {
-    candidates.push("http://localhost:18080/api/v1");
+    candidates.push("http://localhost:18081/api/v1");
     candidates.push("/api/v1");
   } else {
     candidates.push("/api/v1");
-    candidates.push("http://localhost:18080/api/v1");
+    candidates.push("http://localhost:18081/api/v1");
   }
 
   return [...new Set(candidates)];
@@ -202,7 +230,7 @@ export function buildApiBaseCandidates(apiBaseFromQuery) {
 
 export function buildFetchError(error) {
   if (String(error.message || "").includes("Failed to fetch")) {
-    return "无法连接到服务，请稍后重试。";
+    return "无法连接到服务，请检查前后端是否都已启动。";
   }
   return error.message || "数据请求失败。";
 }

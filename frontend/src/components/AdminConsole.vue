@@ -24,6 +24,7 @@ const feedback = reactive({
   text: "",
 });
 const activeLogTab = ref("login");
+const savingUserIds = reactive({});
 
 const menuItems = [
   { id: "overview", label: "平台概览", hint: "平台账号与事项总览" },
@@ -86,6 +87,10 @@ async function loadConsole() {
 
 async function saveUser(user) {
   const draft = ensureUserDraft(user);
+  if (savingUserIds[user.id]) {
+    return;
+  }
+  savingUserIds[user.id] = true;
   try {
     await updateUserManagement(user.id, {
       role: draft.role,
@@ -95,6 +100,8 @@ async function saveUser(user) {
     setFeedback("success", `已更新用户 ${user.username} 的角色和状态。`);
   } catch (error) {
     setFeedback("error", error.message);
+  } finally {
+    delete savingUserIds[user.id];
   }
 }
 
@@ -195,7 +202,9 @@ onMounted(() => {
                   </td>
                   <td>{{ user.origin }}</td>
                   <td>
-                    <button class="table-action" type="button" @click="saveUser(user)">保存</button>
+                    <button class="table-action" type="button" :disabled="Boolean(savingUserIds[user.id])" @click="saveUser(user)">
+                      {{ savingUserIds[user.id] ? "保存中..." : "保存" }}
+                    </button>
                   </td>
                 </tr>
                 <tr v-if="!users.length">

@@ -1,6 +1,6 @@
 import { computed, reactive } from "vue";
-import { listOwnedVehicleIds } from "../services/adminService";
 import { browserMockVehicles, createBrowserMockDashboard } from "./dashboardMock";
+import { getCurrentSession } from "../services/authService";
 import {
   POLL_INTERVAL_MS,
   MAX_ALERTS,
@@ -11,7 +11,7 @@ import {
   clamp,
   deriveRiskLevel,
   formatClock,
-  formatNumber,
+  formatDateTime,
   getHighestAlertLevel,
   levelLabel,
   normalizeAlerts,
@@ -27,13 +27,15 @@ export function useDashboard(currentUser) {
 
   const state = reactive({
     vehicles: [],
-    vehicleId: "",
+    selectedVehicleKey: "",
     vehicleMeta: null,
     latestTelemetry: null,
     alerts: [],
     history: [],
     trajectory: [],
     chartFocusIndex: null,
+    followLatest: true,
+    focusedRecordTime: "",
     replayActive: false,
     isLoading: false,
     lastSyncAt: null,
@@ -57,23 +59,25 @@ export function useDashboard(currentUser) {
   const highestLevel = computed(() =>
     state.alerts.length ? getHighestAlertLevel(state.alerts) : deriveRiskLevel(state.vehicleMeta, state.latestTelemetry),
   );
-  const mockSource = computed(() => state.dataSource === "mock" || state.dataSource === "browser-mock");
   const sceneLabel = computed(() =>
-    state.vehicleMeta?.cargoName ? `${state.vehicleMeta.cargoName}冷链运输` : "疫苗冷链运输",
+    state.vehicleMeta?.cargoName ? `${state.vehicleMeta.cargoName}冷链运输` : "冷链运输",
   );
   const vehicleMetaLabel = computed(() => {
     if (!state.vehicleMeta) {
-      return "等待载入车辆信息...";
+      return "等待载入车辆信息";
     }
-    return `${state.vehicleMeta.plateNumber} · ${vehicleStatusLabel(state.vehicleMeta.status)} · ${state.vehicleMeta.cargoName}`;
+    return `${state.vehicleMeta.plateNumber || "--"} · ${vehicleStatusLabel(state.vehicleMeta.status)} · ${state.vehicleMeta.cargoName}`;
   });
-  const systemTimeLabel = computed(() => activePoint.value?.recordTime?.split(" ")[1] || "--:--:--");
-  const recordTimeLabel = computed(() =>
-    activePoint.value?.recordTime ? `记录时间 ${activePoint.value.recordTime}` : "记录时间待更新",
-  );
+  const systemTimeLabel = computed(() => activePoint.value?.recordTime || "--");
+  const recordTimeLabel = computed(() => {
+    if (state.lastSyncAt) {
+      return `页面刷新时间 ${formatDateTime(state.lastSyncAt)}`;
+    }
+    return "等待首轮同步";
+  });
   const syncStatus = computed(() => {
     if (state.emptyMessage) {
-      return "待配置";
+      return "未配置";
     }
     if (state.error) {
       return "同步异常";
@@ -97,7 +101,7 @@ export function useDashboard(currentUser) {
       return state.emptyMessage;
     }
     if (state.error) {
-      return "数据请求失败，请检查服务连接状态。";
+      return "数据请求失败，请检查前后端连接状态。";
     }
     if (state.isLoading) {
       return "正在更新最新监控数据...";
@@ -129,7 +133,7 @@ export function useDashboard(currentUser) {
     if (state.isLoading) {
       return "同步中";
     }
-    return "实时轮询中";
+    return state.followLatest ? "实时跟随中" : "手动查看历史中";
   });
   const summaryCards = computed(() => {
     if (!state.vehicleMeta || !state.latestTelemetry) {
@@ -148,23 +152,23 @@ export function useDashboard(currentUser) {
       {
         label: "车厢状态",
         value: state.latestTelemetry.doorOpen ? "开门中" : "已关闭",
-        extra: `湿度 ${formatNumber(state.latestTelemetry.humidity)}% · 外部 ${formatNumber(state.latestTelemetry.outsideTemp)}°C`,
+        extra: `湿度 ${state.latestTelemetry.humidity.toFixed(0)}% · 外部 ${state.latestTelemetry.outsideTemp.toFixed(1)}°C`,
       },
       {
         label: "运行状态",
-        value: `${formatNumber(state.latestTelemetry.speed)} km/h`,
-        extra: `剩余 ${formatNumber(state.latestTelemetry.remainingKm)} km`,
+        value: `${state.latestTelemetry.speed.toFixed(1)} km/h`,
+        extra: `剩余 ${state.latestTelemetry.remainingKm.toFixed(1)} km`,
       },
       {
         label: "风险等级",
         value: levelLabel(highestLevel.value),
-        extra: highestAlert ? highestAlert.title : "当前无新增告警",
+        extra: highestAlert ? highestAlert.title : "当前暂无新增告警",
         tone: riskTone,
       },
       {
         label: "车辆状态",
         value: vehicleStatusLabel(state.vehicleMeta.status),
-        extra: `${state.vehicleMeta.plateNumber} · ${state.vehicleMeta.cargoName}`,
+        extra: `${state.vehicleMeta.vehicleId} · 总路程 ${state.vehicleMeta.routeDistanceKm || 0} km`,
       },
     ];
   });
@@ -192,7 +196,7 @@ export function useDashboard(currentUser) {
     for (const candidate of apiBaseCandidates) {
       try {
         const response = await fetchJson(`${candidate}/vehicles`);
-        if (Array.isArray(response.data) && response.data.length) {
+        if (Array.isArray(response.data)) {
           state.apiBase = candidate;
           state.dataSource = response.source;
           state.error = "";
@@ -209,39 +213,32 @@ export function useDashboard(currentUser) {
   }
 
   async function loadVehicles() {
-    const ownedVehicleIds = new Set(listOwnedVehicleIds(currentUser));
-
     if (state.apiBase === "browser-mock") {
-      state.vehicles = browserMockVehicles.filter((item) => ownedVehicleIds.has(item.vehicleId));
+      state.vehicles = browserMockVehicles
+        .filter((item) => item.ownerUserId === currentUser?.userId)
+        .map((item) => normalizeVehicle(item));
     } else {
       const response = await fetchJson(`${state.apiBase}/vehicles`);
-      const allVehicles = Array.isArray(response.data) ? response.data.map(normalizeVehicle) : [];
-      state.vehicles = allVehicles.filter((item) => ownedVehicleIds.has(item.vehicleId));
+      state.vehicles = (Array.isArray(response.data) ? response.data : []).map(normalizeVehicle);
       state.dataSource = response.source;
     }
 
     if (!state.vehicles.length) {
-      state.vehicleId = "";
-      state.vehicleMeta = null;
-      state.latestTelemetry = null;
-      state.alerts = [];
-      state.history = [];
-      state.trajectory = [];
-      state.chartFocusIndex = null;
-      state.emptyMessage = "当前账号下暂无可监控车辆，请先前往“我的车辆”查看归属车辆。";
+      resetVehicleData();
+      state.emptyMessage = "当前账号下暂无可监控车辆，请先到“我的车辆”中创建或维护车辆。";
       return;
     }
 
     state.emptyMessage = "";
-    if (!state.vehicleId || !state.vehicles.some((item) => item.vehicleId === state.vehicleId)) {
-      state.vehicleId = state.vehicles[0].vehicleId;
+    if (!state.selectedVehicleKey || !state.vehicles.some((item) => item.vehicleKey === state.selectedVehicleKey)) {
+      state.selectedVehicleKey = state.vehicles[0].vehicleKey;
     }
 
-    state.vehicleMeta = state.vehicles.find((item) => item.vehicleId === state.vehicleId) || state.vehicles[0];
+    syncVehicleMeta();
   }
 
   async function refreshDashboard() {
-    if (!state.vehicleId) {
+    if (!state.selectedVehicleKey && state.apiBase !== "browser-mock") {
       return;
     }
 
@@ -253,11 +250,12 @@ export function useDashboard(currentUser) {
       let dashboardResponse;
 
       if (state.apiBase === "browser-mock") {
-        [telemetryResponse, alertsResponse] = await createBrowserMockDashboard(state.vehicleId, MAX_ALERTS);
+        const browserMockVehicleId = state.vehicleMeta?.vehicleId || state.selectedVehicleKey;
+        [telemetryResponse, alertsResponse] = await createBrowserMockDashboard(browserMockVehicleId, MAX_ALERTS);
       } else {
         [dashboardResponse, telemetryResponse] = await Promise.all([
-          fetchJson(`${state.apiBase}/dashboard/vehicles/${encodeURIComponent(state.vehicleId)}`),
-          fetchJson(`${state.apiBase}/vehicles/${encodeURIComponent(state.vehicleId)}/telemetry/latest`),
+          fetchJson(`${state.apiBase}/dashboard/vehicles/${encodeURIComponent(state.selectedVehicleKey)}`),
+          fetchJson(`${state.apiBase}/vehicles/${encodeURIComponent(state.selectedVehicleKey)}/telemetry/latest`),
         ]);
         alertsResponse = {
           data: dashboardResponse.data?.alerts || [],
@@ -265,7 +263,7 @@ export function useDashboard(currentUser) {
         };
       }
 
-      state.vehicleMeta = state.vehicles.find((item) => item.vehicleId === state.vehicleId) || state.vehicleMeta;
+      syncVehicleMeta();
       state.latestTelemetry = normalizeTelemetry(telemetryResponse.data);
       state.alerts = normalizeAlerts(alertsResponse.data);
       state.dataSource =
@@ -284,10 +282,7 @@ export function useDashboard(currentUser) {
       state.lastSyncAt = new Date();
       state.error = "";
       state.emptyMessage = "";
-
-      if (state.chartFocusIndex == null || !state.replayActive) {
-        state.chartFocusIndex = latestIndex.value;
-      }
+      applyFocusAfterHistoryRefresh();
     } catch (error) {
       state.error = error.message;
     } finally {
@@ -295,15 +290,17 @@ export function useDashboard(currentUser) {
     }
   }
 
-  async function selectVehicle(nextVehicleId) {
+  async function selectVehicle(nextVehicleKey) {
     stopReplay(false);
-    state.vehicleId = nextVehicleId;
-    state.vehicleMeta = state.vehicles.find((item) => item.vehicleId === state.vehicleId) || null;
+    state.selectedVehicleKey = nextVehicleKey;
+    state.followLatest = true;
+    state.focusedRecordTime = "";
+    state.chartFocusIndex = null;
     state.latestTelemetry = null;
     state.alerts = [];
     state.history = [];
     state.trajectory = [];
-    state.chartFocusIndex = null;
+    syncVehicleMeta();
     await refreshDashboard();
   }
 
@@ -312,13 +309,17 @@ export function useDashboard(currentUser) {
   }
 
   function focusLatest() {
-    stopReplay(true);
+    stopReplay(false);
+    state.followLatest = true;
     state.chartFocusIndex = latestIndex.value;
+    state.focusedRecordTime = state.history[latestIndex.value]?.recordTime || "";
   }
 
   function setActiveIndex(nextIndex) {
     stopReplay(false);
     state.chartFocusIndex = clamp(nextIndex, 0, latestIndex.value);
+    state.followLatest = state.chartFocusIndex >= latestIndex.value;
+    state.focusedRecordTime = state.history[state.chartFocusIndex]?.recordTime || "";
   }
 
   function toggleReplay() {
@@ -333,7 +334,9 @@ export function useDashboard(currentUser) {
 
     stopReplay(false);
     state.replayActive = true;
+    state.followLatest = false;
     state.chartFocusIndex = 0;
+    state.focusedRecordTime = state.history[0]?.recordTime || "";
 
     replayTimer = window.setInterval(() => {
       if (state.chartFocusIndex >= latestIndex.value) {
@@ -341,6 +344,7 @@ export function useDashboard(currentUser) {
         return;
       }
       state.chartFocusIndex += 1;
+      state.focusedRecordTime = state.history[state.chartFocusIndex]?.recordTime || "";
     }, 900);
   }
 
@@ -351,18 +355,36 @@ export function useDashboard(currentUser) {
     }
     state.replayActive = false;
     if (resetToLatest && state.history.length) {
+      state.followLatest = true;
       state.chartFocusIndex = latestIndex.value;
+      state.focusedRecordTime = state.history[latestIndex.value]?.recordTime || "";
     }
   }
 
   function appendHistoryPoint(telemetry) {
-    const sampledAt = formatClock(new Date());
     const point = {
       ...telemetry,
-      sampleTime: sampledAt,
+      sampleTime: telemetry.recordTime?.split(" ")[1] || formatClock(new Date()),
     };
 
-    state.history = [...state.history, point].slice(-MAX_HISTORY);
+    const nextHistory = [...state.history];
+    const lastPoint = nextHistory[nextHistory.length - 1];
+    if (lastPoint?.recordTime === point.recordTime) {
+      nextHistory[nextHistory.length - 1] = point;
+    } else {
+      nextHistory.push(point);
+    }
+
+    state.history = nextHistory.slice(-MAX_HISTORY);
+    syncTrajectory();
+  }
+
+  function applyDashboardSnapshot(dashboard, latestTelemetry) {
+    state.history = buildDashboardHistory(dashboard?.temperatureHistory, latestTelemetry, dashboard?.route).slice(-MAX_HISTORY);
+    syncTrajectory();
+  }
+
+  function syncTrajectory() {
     state.trajectory = state.history.map((item) => ({
       lng: item.lng,
       lat: item.lat,
@@ -370,44 +392,83 @@ export function useDashboard(currentUser) {
       recordTime: item.recordTime,
       remainingKm: item.remainingKm,
     }));
-
-    if (!state.replayActive) {
-      state.chartFocusIndex = latestIndex.value;
-    }
   }
 
-  function applyDashboardSnapshot(dashboard, latestTelemetry) {
-    const history = buildDashboardHistory(dashboard?.temperatureHistory, latestTelemetry, dashboard?.route).slice(-MAX_HISTORY);
-
-    state.history = history;
-    state.trajectory = history.map((item) => ({
-      lng: item.lng,
-      lat: item.lat,
-      sampleTime: item.sampleTime,
-      recordTime: item.recordTime,
-      remainingKm: item.remainingKm,
-    }));
-
-    if (!state.replayActive) {
-      state.chartFocusIndex = latestIndex.value;
+  function applyFocusAfterHistoryRefresh() {
+    if (!state.history.length) {
+      state.chartFocusIndex = null;
+      state.focusedRecordTime = "";
+      return;
     }
+
+    if (state.replayActive) {
+      state.chartFocusIndex = clamp(state.chartFocusIndex ?? 0, 0, latestIndex.value);
+      state.focusedRecordTime = state.history[state.chartFocusIndex]?.recordTime || "";
+      return;
+    }
+
+    if (state.followLatest) {
+      state.chartFocusIndex = latestIndex.value;
+      state.focusedRecordTime = state.history[latestIndex.value]?.recordTime || "";
+      return;
+    }
+
+    const targetTime = state.focusedRecordTime;
+    const matchedIndex = targetTime ? state.history.findIndex((item) => item.recordTime === targetTime) : -1;
+    if (matchedIndex >= 0) {
+      state.chartFocusIndex = matchedIndex;
+      return;
+    }
+
+    state.chartFocusIndex = clamp(state.chartFocusIndex ?? 0, 0, latestIndex.value);
+    state.focusedRecordTime = state.history[state.chartFocusIndex]?.recordTime || "";
+  }
+
+  function syncVehicleMeta() {
+    state.vehicleMeta = state.vehicles.find((item) => item.vehicleKey === state.selectedVehicleKey) || state.vehicles[0] || null;
+  }
+
+  function resetVehicleData() {
+    state.selectedVehicleKey = "";
+    state.vehicleMeta = null;
+    state.latestTelemetry = null;
+    state.alerts = [];
+    state.history = [];
+    state.trajectory = [];
+    state.chartFocusIndex = null;
+    state.followLatest = true;
+    state.focusedRecordTime = "";
   }
 
   async function fetchJson(url) {
+    const session = getCurrentSession();
+    const headers = {
+      Accept: "application/json",
+    };
+
+    if (session?.token) {
+      headers.Authorization = `Bearer ${session.token}`;
+    }
+
     const response = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-      },
+      headers,
       cache: "no-store",
     });
 
     if (!response.ok) {
-      throw new Error(`请求失败：${response.status}`);
+      let message = `请求失败：${response.status}`;
+      try {
+        const payload = await response.json();
+        message = payload.message || message;
+      } catch {
+        // ignore
+      }
+      throw new Error(message);
     }
 
     const payload = await response.json();
     if (!payload.success) {
-      throw new Error(payload.message || "接口返回失败。");
+      throw new Error(payload.message || "接口返回失败");
     }
 
     return {

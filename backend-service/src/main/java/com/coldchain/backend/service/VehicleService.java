@@ -7,6 +7,7 @@ import com.coldchain.backend.dto.VehicleResponse;
 import com.coldchain.backend.entity.AlertRecord;
 import com.coldchain.backend.entity.TelemetryRecord;
 import com.coldchain.backend.entity.Vehicle;
+import com.coldchain.backend.exception.AuthException;
 import com.coldchain.backend.exception.NotFoundException;
 import com.coldchain.backend.repository.MockDataRepository;
 import java.time.format.DateTimeFormatter;
@@ -16,40 +17,39 @@ import org.springframework.stereotype.Service;
 @Service
 public class VehicleService {
     private static final DateTimeFormatter FULL_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final DateTimeFormatter SHORT_TIME = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter SHORT_TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private final MockDataRepository repository;
-    private final SimulationTimelineService simulationTimelineService;
+    private final RealtimeTelemetryService realtimeTelemetryService;
 
-    public VehicleService(MockDataRepository repository, SimulationTimelineService simulationTimelineService) {
+    public VehicleService(MockDataRepository repository, RealtimeTelemetryService realtimeTelemetryService) {
         this.repository = repository;
-        this.simulationTimelineService = simulationTimelineService;
+        this.realtimeTelemetryService = realtimeTelemetryService;
     }
 
-    public List<VehicleResponse> getVehicles() {
-        return repository.findAllVehicles().stream().map(this::toVehicleResponse).toList();
+    public List<VehicleResponse> getVehicles(String userId) {
+        return repository.findVehiclesByOwnerUserId(userId).stream().map(this::toVehicleResponse).toList();
     }
 
     public List<Vehicle> getVehicleEntities() {
         return repository.findAllVehicles();
     }
 
-    public TelemetryLatestResponse getLatestTelemetry(String vehicleCode) {
-        validateVehicle(vehicleCode);
-        TelemetryRecord record = simulationTimelineService.getCurrentTelemetry(vehicleCode);
-        return toLatestResponse(record);
+    public TelemetryLatestResponse getLatestTelemetry(String userId, String vehicleCode) {
+        Vehicle vehicle = validateOwnedVehicle(userId, vehicleCode);
+        return toLatestResponse(vehicle, realtimeTelemetryService.getCurrentTelemetry(vehicle));
     }
 
-    public List<TelemetryPointResponse> getTelemetryHistory(String vehicleCode, int minutes) {
-        validateVehicle(vehicleCode);
-        return simulationTimelineService.getCurrentTelemetryHistory(vehicleCode, minutes).stream()
+    public List<TelemetryPointResponse> getTelemetryHistory(String userId, String vehicleCode, int minutes) {
+        Vehicle vehicle = validateOwnedVehicle(userId, vehicleCode);
+        return realtimeTelemetryService.getTelemetryHistory(vehicle, minutes).stream()
                 .map(this::toTelemetryPoint)
                 .toList();
     }
 
-    public List<AlertResponse> getVehicleAlerts(String vehicleCode, Integer limit) {
-        validateVehicle(vehicleCode);
-        List<AlertResponse> results = simulationTimelineService.getCurrentAlerts(vehicleCode).stream()
+    public List<AlertResponse> getVehicleAlerts(String userId, String vehicleCode, Integer limit) {
+        Vehicle vehicle = validateOwnedVehicle(userId, vehicleCode);
+        List<AlertResponse> results = getLiveAlertEntities(vehicle).stream()
                 .map(this::toAlertResponse)
                 .toList();
         if (limit == null || limit <= 0 || limit >= results.size()) {
@@ -58,8 +58,8 @@ public class VehicleService {
         return results.subList(0, limit);
     }
 
-    public List<AlertResponse> getAlerts(String vehicleCode, int page, int pageSize) {
-        List<AlertResponse> alerts = getVehicleAlerts(vehicleCode, null);
+    public List<AlertResponse> getAlerts(String userId, String vehicleCode, int page, int pageSize) {
+        List<AlertResponse> alerts = getVehicleAlerts(userId, vehicleCode, null);
         int safePage = Math.max(page, 1);
         int safePageSize = Math.max(pageSize, 1);
         int fromIndex = (safePage - 1) * safePageSize;
@@ -70,40 +70,72 @@ public class VehicleService {
         return alerts.subList(fromIndex, toIndex);
     }
 
-    public AlertResponse getAlertDetail(String alertId) {
+    public AlertResponse getAlertDetail(String userId, String alertId) {
         AlertRecord alert = repository.findAlertById(alertId)
                 .orElseThrow(() -> new NotFoundException("未找到告警记录: " + alertId));
+        ensureVehicleOwnership(userId, alert.vehicleCode());
         return toAlertResponse(alert);
     }
 
     public Vehicle getVehicleEntity(String vehicleCode) {
-        return validateVehicle(vehicleCode);
-    }
-
-    public List<TelemetryRecord> getTelemetryEntities(String vehicleCode) {
-        validateVehicle(vehicleCode);
-        return simulationTimelineService.getCurrentTelemetryHistory(vehicleCode, Integer.MAX_VALUE);
-    }
-
-    private Vehicle validateVehicle(String vehicleCode) {
         return repository.findVehicleByCode(vehicleCode)
                 .orElseThrow(() -> new NotFoundException("未找到车辆信息: " + vehicleCode));
     }
 
+    public Vehicle getOwnedVehicleEntity(String userId, String vehicleCode) {
+        return validateOwnedVehicle(userId, vehicleCode);
+    }
+
+    public List<TelemetryRecord> getTelemetryEntities(String userId, String vehicleCode) {
+        Vehicle vehicle = validateOwnedVehicle(userId, vehicleCode);
+        return realtimeTelemetryService.getTelemetryHistory(vehicle, Integer.MAX_VALUE);
+    }
+
+    public List<TelemetryRecord> getTelemetryEntities(String vehicleCode) {
+        Vehicle vehicle = getVehicleEntity(vehicleCode);
+        return realtimeTelemetryService.getTelemetryHistory(vehicle, Integer.MAX_VALUE);
+    }
+
+    public List<AlertRecord> getLiveAlertEntities(String vehicleCode) {
+        Vehicle vehicle = getVehicleEntity(vehicleCode);
+        return getLiveAlertEntities(vehicle);
+    }
+
+    private List<AlertRecord> getLiveAlertEntities(Vehicle vehicle) {
+        TelemetryRecord currentTelemetry = realtimeTelemetryService.getCurrentTelemetry(vehicle);
+        return realtimeTelemetryService.buildLiveAlerts(vehicle, currentTelemetry);
+    }
+
+    private Vehicle validateOwnedVehicle(String userId, String vehicleCode) {
+        Vehicle vehicle = repository.findVehicleByCode(vehicleCode)
+                .orElseThrow(() -> new NotFoundException("未找到车辆信息: " + vehicleCode));
+        if (!userId.equals(vehicle.ownerUserId())) {
+            throw new AuthException(403, "当前账号无权访问该车辆");
+        }
+        return vehicle;
+    }
+
+    private void ensureVehicleOwnership(String userId, String vehicleCode) {
+        validateOwnedVehicle(userId, vehicleCode);
+    }
+
     private VehicleResponse toVehicleResponse(Vehicle vehicle) {
         return new VehicleResponse(
+                vehicle.vehicleCode(),
+                vehicle.displayCode(),
                 vehicle.vehicleCode(),
                 vehicle.plateNumber(),
                 vehicle.cargoType(),
                 vehicle.cargoName(),
                 vehicle.safeTempMin(),
                 vehicle.safeTempMax(),
-                vehicle.status());
+                vehicle.status(),
+                vehicle.routeDistanceKm());
     }
 
-    private TelemetryLatestResponse toLatestResponse(TelemetryRecord record) {
+    private TelemetryLatestResponse toLatestResponse(Vehicle vehicle, TelemetryRecord record) {
         return new TelemetryLatestResponse(
-                record.vehicleCode(),
+                vehicle.displayCode(),
                 record.recordTime().format(FULL_TIME),
                 record.temperature(),
                 record.humidity(),
@@ -124,9 +156,12 @@ public class VehicleService {
     }
 
     private AlertResponse toAlertResponse(AlertRecord alert) {
+        String displayCode = repository.findVehicleByCode(alert.vehicleCode())
+                .map(Vehicle::displayCode)
+                .orElse(alert.vehicleCode());
         return new AlertResponse(
                 alert.alertId(),
-                alert.vehicleCode(),
+                displayCode,
                 alert.level(),
                 alert.title(),
                 alert.detail(),

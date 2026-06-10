@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface AlertRecordJpaRepository extends JpaRepository<AlertRecordEntity, Long> {
     List<AlertRecordEntity> findByVehicleCodeOrderByTriggerTimeDesc(String vehicleCode);
+    List<AlertRecordEntity> findByOwnerUserIdAndDomainOrderByTriggerTimeDesc(String ownerUserId, String domain);
+    List<AlertRecordEntity> findByDomainOrderByTriggerTimeDesc(String domain);
 
     Optional<AlertRecordEntity> findByAlertId(String alertId);
 }

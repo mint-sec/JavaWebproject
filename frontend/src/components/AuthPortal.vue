@@ -72,9 +72,7 @@ async function submitRegister() {
 
       <div class="auth-tabs">
         <button :class="['auth-tab', { active: mode === 'login' }]" type="button" @click="mode = 'login'">登录</button>
-        <button :class="['auth-tab', { active: mode === 'register' }]" type="button" @click="mode = 'register'">
-          注册
-        </button>
+        <button :class="['auth-tab', { active: mode === 'register' }]" type="button" @click="mode = 'register'">注册</button>
       </div>
 
       <form v-if="mode === 'login'" class="auth-form" @submit.prevent="submitLogin">
@@ -94,24 +92,25 @@ async function submitRegister() {
       <form v-else class="auth-form" @submit.prevent="submitRegister">
         <label>
           <span>用户名</span>
-          <input v-model.trim="registerForm.username" type="text" placeholder="请输入用户名" />
+          <input v-model.trim="registerForm.username" type="text" placeholder="3-20 个字符，将同时作为登录账号和显示名称" />
         </label>
         <label>
           <span>手机号</span>
-          <input v-model.trim="registerForm.phone" type="tel" placeholder="请输入手机号" />
+          <input v-model.trim="registerForm.phone" type="tel" placeholder="请输入 11 位手机号" />
         </label>
         <label>
           <span>邮箱</span>
-          <input v-model.trim="registerForm.email" type="email" placeholder="请输入邮箱地址" />
+          <input v-model.trim="registerForm.email" type="email" placeholder="请输入常用邮箱" />
         </label>
         <label>
           <span>密码</span>
-          <input v-model="registerForm.password" type="password" placeholder="至少 6 位字符" />
+          <input v-model="registerForm.password" type="password" placeholder="请输入 6-32 位密码" />
         </label>
         <label>
           <span>确认密码</span>
           <input v-model="registerForm.confirmPassword" type="password" placeholder="请再次输入密码" />
         </label>
+        <p class="auth-helper">注册后，用户名会直接作为你的登录标识和页面显示名称。</p>
         <button class="auth-submit" type="submit" :disabled="loading">
           {{ loading ? "注册中..." : "创建账号" }}
         </button>

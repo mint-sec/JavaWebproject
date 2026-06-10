@@ -6,6 +6,7 @@ const props = defineProps({
   history: { type: Array, required: true },
   activePoint: { type: Object, default: null },
   activeIndex: { type: Number, required: true },
+  followLatest: { type: Boolean, required: true },
   latestTelemetry: { type: Object, default: null },
   selectedVehicle: { type: Object, default: null },
   temperatureTone: { type: String, default: "" },
@@ -29,12 +30,14 @@ const chartData = computed(() => {
   const min = Math.max(0, Math.floor(Math.min(...values, safeMin) - 1));
   const max = Math.ceil(Math.max(...values, safeMax) + 1);
   const xStep = innerWidth / Math.max(props.history.length - 1, 1);
+  const labelStep = Math.max(1, Math.ceil(props.history.length / 8));
   const toY = (value) => padding.top + innerHeight - ((value - min) / (max - min || 1)) * innerHeight;
   const points = props.history.map((item, index) => ({
     ...item,
     x: padding.left + index * xStep,
     y: toY(item.temperature),
-    label: item.sampleTime.slice(3),
+    label: item.sampleTime,
+    showLabel: index === props.activeIndex || index === props.history.length - 1 || index % labelStep === 0,
   }));
 
   return {
@@ -101,7 +104,7 @@ const chartData = computed(() => {
 
         <g
           v-for="(point, index) in chartData.points"
-          :key="`${point.sampleTime}-${index}`"
+          :key="`${point.recordTime}-${index}`"
           class="chart-point"
           @click="emit('set-active-index', index)"
         >
@@ -113,7 +116,13 @@ const chartData = computed(() => {
             :stroke="index === activeIndex ? '#24d7ad' : '#61d8ff'"
             stroke-width="3"
           />
-          <text :x="point.x - 18" :y="chartData.height - 18" :fill="index === activeIndex ? '#eff7fa' : '#88a5b0'" font-size="12">
+          <text
+            v-if="point.showLabel"
+            :x="point.x - 22"
+            :y="chartData.height - 18"
+            :fill="index === activeIndex ? '#eff7fa' : '#88a5b0'"
+            font-size="12"
+          >
             {{ point.label }}
           </text>
         </g>
@@ -141,11 +150,11 @@ const chartData = computed(() => {
           {{
             activePoint
               ? `湿度 ${formatNumber(activePoint.humidity)}% · 速度 ${formatNumber(activePoint.speed)} km/h · ${activePoint.doorOpen ? "车门开启中" : "车门已关闭"} · 记录时间 ${activePoint.recordTime}`
-              : "点击折线中的采样点，可联动查看该时刻的车辆位置和运行指标。"
+              : "点击折线中的采样点，可以联动查看该时刻的车辆位置和运行指标。"
           }}
         </small>
       </div>
-      <button class="ghost-button" type="button" :disabled="!history.length" @click="emit('focus-latest')">回到最新</button>
+      <button class="ghost-button" type="button" :disabled="followLatest || !history.length" @click="emit('focus-latest')">回到最新</button>
     </div>
 
     <div class="chart-footer">
@@ -158,8 +167,8 @@ const chartData = computed(() => {
         <strong>{{ latestTelemetry ? `${latestTelemetry.temperature.toFixed(1)}°C` : "--.-°C" }}</strong>
       </div>
       <div>
-        <span>温度趋势</span>
-        <strong>{{ activePoint?.trend || "--" }}</strong>
+        <span>查看模式</span>
+        <strong>{{ followLatest ? "跟随最新采样" : "手动查看历史" }}</strong>
       </div>
     </div>
   </section>

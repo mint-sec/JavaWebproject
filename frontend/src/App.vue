@@ -6,11 +6,15 @@ import AdminConsole from "./components/AdminConsole.vue";
 import MyVehiclesView from "./components/MyVehiclesView.vue";
 import MyAlertsView from "./components/MyAlertsView.vue";
 import { getCurrentSession, hasAdminRole, logoutUser, onSessionChanged } from "./services/authService";
+import { onAppNotice } from "./services/noticeCenter";
 
 let offSessionChange = null;
+let offAppNotice = null;
+let noticeTimer = 0;
 
 const session = ref(getCurrentSession());
 const currentView = ref(resolveView(window.location.hash, session.value));
+const globalNotice = ref(null);
 
 const canAccessAdmin = computed(() => hasAdminRole(session.value));
 const mainNavItems = computed(() => {
@@ -81,12 +85,14 @@ function navigate(view) {
 
 function handleAuthSuccess(nextSession) {
   session.value = nextSession;
+  clearGlobalNotice();
   navigate("dashboard");
 }
 
 function handleLogout() {
   logoutUser();
   session.value = null;
+  clearGlobalNotice();
   navigate("auth");
 }
 
@@ -99,9 +105,39 @@ function handleSessionRefresh() {
   syncViewFromHash();
 }
 
+function clearGlobalNotice() {
+  globalNotice.value = null;
+  if (noticeTimer) {
+    window.clearTimeout(noticeTimer);
+    noticeTimer = 0;
+  }
+}
+
+function handleAppNotice(detail) {
+  if (!detail?.message) {
+    return;
+  }
+
+  globalNotice.value = {
+    type: detail.type || "error",
+    message: detail.message,
+  };
+
+  if (noticeTimer) {
+    window.clearTimeout(noticeTimer);
+  }
+
+  if (detail.duration !== 0) {
+    noticeTimer = window.setTimeout(() => {
+      clearGlobalNotice();
+    }, detail.duration || 4200);
+  }
+}
+
 onMounted(() => {
   window.addEventListener("hashchange", syncViewFromHash);
   offSessionChange = onSessionChanged(handleSessionRefresh);
+  offAppNotice = onAppNotice(handleAppNotice);
   if (!window.location.hash) {
     navigate(currentView.value);
   } else {
@@ -115,11 +151,23 @@ onBeforeUnmount(() => {
     offSessionChange();
     offSessionChange = null;
   }
+  if (typeof offAppNotice === "function") {
+    offAppNotice();
+    offAppNotice = null;
+  }
+  clearGlobalNotice();
 });
 </script>
 
 <template>
   <div class="portal-shell">
+    <transition name="notice-fade">
+      <div v-if="globalNotice" :class="['global-notice', globalNotice.type]">
+        <span>{{ globalNotice.message }}</span>
+        <button type="button" @click="clearGlobalNotice">知道了</button>
+      </div>
+    </transition>
+
     <div v-if="session" class="portal-header">
       <div class="portal-header-main">
         <h2>{{ shellTitle }}</h2>

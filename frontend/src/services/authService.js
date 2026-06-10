@@ -1,270 +1,118 @@
-import { appendLoginLog } from "./auditService";
-
-const USERS_KEY = "coldchain.frontend.auth.users";
-const SESSION_KEY = "coldchain.frontend.auth.session";
-const SESSION_EVENT = "coldchain-session-changed";
+import { apiRequest, resetApiBaseCache } from "./apiClient";
+import { clearSession, onSessionChanged, readSession, writeSession } from "./sessionStore";
 
 export const USER_STATUS_ACTIVE = "启用中";
 export const USER_STATUS_BANNED = "已封禁";
 
-const seedUsers = [
-  {
-    id: "USR-ADMIN-001",
-    username: "admin",
-    phone: "13800000001",
-    email: "admin@coldchain.local",
-    password: "Admin123!",
-    displayName: "admin",
-    role: "ADMIN",
-    status: USER_STATUS_ACTIVE,
-    origin: "系统账号",
-  },
-  {
-    id: "USR-OPS-001",
-    username: "operator",
-    phone: "13800000002",
-    email: "operator@coldchain.local",
-    password: "Operator123!",
-    displayName: "operator",
-    role: "USER",
-    status: USER_STATUS_ACTIVE,
-    origin: "系统账号",
-  },
-];
-
-function wait(ms = 220) {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
+function isValidPhone(phone) {
+  return /^1\d{10}$/.test(phone);
 }
 
-function readJson(key, fallback) {
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeJson(key, value) {
-  window.localStorage.setItem(key, JSON.stringify(value));
-}
-
-function notifySessionChanged() {
-  window.dispatchEvent(new CustomEvent(SESSION_EVENT));
-}
-
-function ensureUsers() {
-  const existing = readJson(USERS_KEY, null);
-  if (Array.isArray(existing) && existing.length) {
-    return existing;
-  }
-  writeJson(USERS_KEY, seedUsers);
-  return seedUsers;
-}
-
-function saveUsers(users) {
-  writeJson(USERS_KEY, users);
-}
-
-function toPublicUser(user) {
-  const { password, ...rest } = user;
-  return {
-    ...rest,
-    roleLabel: user.role === "ADMIN" ? "管理员" : "普通用户",
-  };
-}
-
-function toSession(user) {
-  return {
-    userId: user.id,
-    username: user.username,
-    displayName: user.displayName,
-    role: user.role,
-    roleLabel: user.role === "ADMIN" ? "管理员" : "普通用户",
-    token: `local-session-${user.id}`,
-    loggedInAt: new Date().toISOString(),
-  };
-}
-
-function writeSession(session) {
-  writeJson(SESSION_KEY, session);
-  notifySessionChanged();
-}
-
-function syncCurrentSession(nextUser) {
-  const currentSession = readJson(SESSION_KEY, null);
-  if (!currentSession || currentSession.userId !== nextUser.id) {
-    return;
-  }
-
-  if (nextUser.status !== USER_STATUS_ACTIVE) {
-    window.localStorage.removeItem(SESSION_KEY);
-    notifySessionChanged();
-    return;
-  }
-
-  writeSession(toSession(nextUser));
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 export function getCurrentSession() {
-  return readJson(SESSION_KEY, null);
-}
-
-export function onSessionChanged(listener) {
-  window.addEventListener(SESSION_EVENT, listener);
-  return () => window.removeEventListener(SESSION_EVENT, listener);
+  return readSession();
 }
 
 export function hasAdminRole(session) {
   return session?.role === "ADMIN";
 }
 
-export function listRegisteredUsers() {
-  return ensureUsers().map(toPublicUser);
-}
-
-export function updateStoredUser(userId, patch) {
-  const users = ensureUsers();
-  const index = users.findIndex((item) => item.id === userId);
-  if (index < 0) {
-    throw new Error("未找到对应用户。");
-  }
-
-  const nextUser = {
-    ...users[index],
-    ...patch,
-    displayName: patch.username || users[index].displayName,
-  };
-  const nextUsers = [...users];
-  nextUsers[index] = nextUser;
-  saveUsers(nextUsers);
-  syncCurrentSession(nextUser);
-  return toPublicUser(nextUser);
-}
-
 export async function loginUser({ account, password }) {
-  await wait();
+  const normalizedAccount = String(account || "").trim();
+  const normalizedPassword = String(password || "");
 
-  if (!account || !password) {
-    appendLoginLog({
-      account: String(account || "").trim() || "未输入",
-      roleLabel: "未知",
-      result: "失败",
-      ip: "127.0.0.1",
-      detail: "未填写完整登录信息",
-    });
-    throw new Error("请输入用户名和密码。");
+  if (!normalizedAccount) {
+    throw new Error("请输入用户名。");
+  }
+  if (!normalizedPassword) {
+    throw new Error("请输入密码。");
   }
 
-  const normalizedAccount = String(account).trim().toLowerCase();
-  const users = ensureUsers();
-  const user = users.find((item) => item.username.toLowerCase() === normalizedAccount);
-
-  if (!user || user.password !== password) {
-    appendLoginLog({
+  resetApiBaseCache();
+  const session = await apiRequest("/auth/login", {
+    method: "POST",
+    body: {
       account: normalizedAccount,
-      roleLabel: "未知",
-      result: "失败",
-      ip: "127.0.0.1",
-      detail: "用户名或密码错误",
-    });
-    throw new Error("用户名或密码错误。");
-  }
-  if (user.status !== USER_STATUS_ACTIVE) {
-    appendLoginLog({
-      account: user.username,
-      roleLabel: user.role === "ADMIN" ? "管理员" : "普通用户",
-      result: "失败",
-      ip: "127.0.0.1",
-      detail: "账号已被封禁，登录被拒绝",
-    });
-    throw new Error("该账号已被封禁，无法登录。");
-  }
-
-  const session = toSession(user);
-  writeSession(session);
-  appendLoginLog({
-    account: user.username,
-    roleLabel: user.role === "ADMIN" ? "管理员" : "普通用户",
-    result: "成功",
-    ip: "127.0.0.1",
-    detail: "登录成功",
+      password: normalizedPassword,
+    },
+    withAuth: false,
   });
+
+  writeSession(session);
   return session;
 }
 
 export async function registerUser(form) {
-  await wait();
+  const payload = {
+    username: String(form.username || "").trim(),
+    phone: String(form.phone || "").trim(),
+    email: String(form.email || "").trim().toLowerCase(),
+    password: String(form.password || ""),
+    confirmPassword: String(form.confirmPassword || ""),
+  };
 
-  const username = String(form.username || "").trim();
-  const phone = String(form.phone || "").trim();
-  const email = String(form.email || "").trim().toLowerCase();
-  const password = String(form.password || "");
-  const confirmPassword = String(form.confirmPassword || "");
-
-  if (!username || !phone || !email || !password) {
-    throw new Error("请完整填写注册信息。");
+  if (!payload.username) {
+    throw new Error("请输入用户名。用户名将同时作为登录账号和页面显示名称。");
   }
-  if (!/^1\d{10}$/.test(phone)) {
-    throw new Error("请输入正确的 11 位手机号。");
+  if (payload.username.length < 3) {
+    throw new Error("用户名至少需要 3 个字符。");
   }
-  if (password.length < 6) {
-    throw new Error("密码长度至少为 6 位。");
+  if (payload.username.length > 20) {
+    throw new Error("用户名不能超过 20 个字符。");
   }
-  if (password !== confirmPassword) {
+  if (!payload.phone) {
+    throw new Error("请输入手机号。");
+  }
+  if (!isValidPhone(payload.phone)) {
+    throw new Error("手机号格式不正确，请输入 11 位大陆手机号。");
+  }
+  if (!payload.email) {
+    throw new Error("请输入邮箱。");
+  }
+  if (!isValidEmail(payload.email)) {
+    throw new Error("邮箱格式不正确，请重新输入。");
+  }
+  if (!payload.password) {
+    throw new Error("请输入密码。");
+  }
+  if (payload.password.length < 6) {
+    throw new Error("密码至少需要 6 位。");
+  }
+  if (payload.password.length > 32) {
+    throw new Error("密码不能超过 32 位。");
+  }
+  if (!payload.confirmPassword) {
+    throw new Error("请再次输入确认密码。");
+  }
+  if (payload.password !== payload.confirmPassword) {
     throw new Error("两次输入的密码不一致。");
   }
 
-  const users = ensureUsers();
-  if (users.some((item) => item.username.toLowerCase() === username.toLowerCase())) {
-    throw new Error("用户名已存在。");
-  }
-  if (users.some((item) => item.phone === phone)) {
-    throw new Error("手机号已存在。");
-  }
-  if (users.some((item) => item.email.toLowerCase() === email)) {
-    throw new Error("邮箱已存在。");
-  }
-
-  const user = {
-    id: `USR-${Date.now()}`,
-    username,
-    phone,
-    email,
-    password,
-    displayName: username,
-    role: "USER",
-    status: USER_STATUS_ACTIVE,
-    origin: "注册账号",
-  };
-
-  saveUsers([...users, user]);
-
-  const session = toSession(user);
-  writeSession(session);
-  appendLoginLog({
-    account: user.username,
-    roleLabel: "普通用户",
-    result: "成功",
-    ip: "127.0.0.1",
-    detail: "注册成功并自动登录",
+  resetApiBaseCache();
+  const session = await apiRequest("/auth/register", {
+    method: "POST",
+    body: payload,
+    withAuth: false,
   });
+
+  writeSession(session);
   return session;
 }
 
 export function logoutUser() {
-  const currentSession = readJson(SESSION_KEY, null);
-  window.localStorage.removeItem(SESSION_KEY);
-  notifySessionChanged();
-  if (currentSession) {
-    appendLoginLog({
-      account: currentSession.username,
-      roleLabel: currentSession.roleLabel,
-      result: "退出",
-      ip: "127.0.0.1",
-      detail: "用户主动退出登录",
-    });
+  const session = readSession();
+
+  if (session?.token) {
+    apiRequest("/auth/logout", {
+      method: "POST",
+      withAuth: true,
+    }).catch(() => {});
   }
+
+  clearSession();
 }
+
+export { onSessionChanged };

@@ -23,13 +23,13 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ApiResponse<SessionResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ApiResponse.ok(authService.login(request));
+    public ApiResponse<SessionResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpServletRequest) {
+        return ApiResponse.ok(authService.login(request, resolveIp(httpServletRequest)));
     }
 
     @PostMapping("/register")
-    public ApiResponse<SessionResponse> register(@Valid @RequestBody RegisterRequest request) {
-        return ApiResponse.ok(authService.register(request));
+    public ApiResponse<SessionResponse> register(@Valid @RequestBody RegisterRequest request, HttpServletRequest httpServletRequest) {
+        return ApiResponse.ok(authService.register(request, resolveIp(httpServletRequest)));
     }
 
     @GetMapping("/me")
@@ -39,7 +39,19 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ApiResponse<Void> logout() {
+    public ApiResponse<Void> logout(HttpServletRequest request) {
+        authService.logout(
+                (String) request.getAttribute("username"),
+                (String) request.getAttribute("role"),
+                resolveIp(request));
         return ApiResponse.ok(null);
+    }
+
+    private String resolveIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr() == null ? "127.0.0.1" : request.getRemoteAddr();
     }
 }

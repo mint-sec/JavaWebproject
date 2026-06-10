@@ -24,21 +24,24 @@ public class AnalysisService {
     private static final DateTimeFormatter FULL_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final VehicleService vehicleService;
+    private final RealtimeTelemetryService realtimeTelemetryService;
     private final SimulationTimelineService simulationTimelineService;
     private final AlgorithmGateway algorithmGateway;
 
     public AnalysisService(
             VehicleService vehicleService,
+            RealtimeTelemetryService realtimeTelemetryService,
             SimulationTimelineService simulationTimelineService,
             AlgorithmGateway algorithmGateway) {
         this.vehicleService = vehicleService;
+        this.realtimeTelemetryService = realtimeTelemetryService;
         this.simulationTimelineService = simulationTimelineService;
         this.algorithmGateway = algorithmGateway;
     }
 
     public AlertSummaryResponse getAlertSummary(String vehicleCode) {
         vehicleService.getVehicleEntity(vehicleCode);
-        List<AlertRecord> alerts = simulationTimelineService.getCurrentAlerts(vehicleCode);
+        List<AlertRecord> alerts = vehicleService.getLiveAlertEntities(vehicleCode);
         if (alerts.isEmpty()) {
             return new AlertSummaryResponse(vehicleCode, 0, "NONE", false, null, null);
         }
@@ -102,9 +105,9 @@ public class AnalysisService {
     }
 
     private RiskAssessmentResponse evaluateRisk(String vehicleCode, Vehicle vehicle) {
-        TelemetryRecord latest = simulationTimelineService.getCurrentTelemetry(vehicleCode);
-        List<TelemetryRecord> telemetryHistory = simulationTimelineService.getCurrentTelemetryHistory(vehicleCode, Integer.MAX_VALUE);
-        List<AlertRecord> alerts = simulationTimelineService.getCurrentAlerts(vehicleCode);
+        TelemetryRecord latest = realtimeTelemetryService.getCurrentTelemetry(vehicle);
+        List<TelemetryRecord> telemetryHistory = realtimeTelemetryService.getTelemetryHistory(vehicle, Integer.MAX_VALUE);
+        List<AlertRecord> alerts = vehicleService.getLiveAlertEntities(vehicleCode);
         AlgorithmEvaluation evaluation = algorithmGateway.evaluate(vehicleCode, vehicle, latest, telemetryHistory, alerts);
 
         return new RiskAssessmentResponse(
@@ -144,9 +147,9 @@ public class AnalysisService {
 
     public List<AlgorithmRecommendation> buildDynamicRecommendations(String vehicleCode) {
         Vehicle vehicle = vehicleService.getVehicleEntity(vehicleCode);
-        TelemetryRecord latest = simulationTimelineService.getCurrentTelemetry(vehicleCode);
-        List<TelemetryRecord> history = simulationTimelineService.getCurrentTelemetryHistory(vehicleCode, Integer.MAX_VALUE);
-        List<AlertRecord> alerts = simulationTimelineService.getCurrentAlerts(vehicleCode);
+        TelemetryRecord latest = realtimeTelemetryService.getCurrentTelemetry(vehicle);
+        List<TelemetryRecord> history = realtimeTelemetryService.getTelemetryHistory(vehicle, Integer.MAX_VALUE);
+        List<AlertRecord> alerts = vehicleService.getLiveAlertEntities(vehicleCode);
         AlgorithmEvaluation evaluation = algorithmGateway.evaluate(vehicleCode, vehicle, latest, history, alerts);
         return new ArrayList<>(evaluation.recommendations());
     }

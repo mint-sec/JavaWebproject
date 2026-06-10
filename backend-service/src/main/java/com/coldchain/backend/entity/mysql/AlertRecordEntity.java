@@ -45,6 +45,9 @@ public class AlertRecordEntity {
     @Column(length = 64)
     private String owner;
 
+    @Column(name = "owner_user_id", length = 32)
+    private String ownerUserId;
+
     @Column(name = "process_status", length = 16)
     private String processStatus;
 
@@ -53,6 +56,9 @@ public class AlertRecordEntity {
 
     @Column(name = "handled_at")
     private LocalDateTime handledAt;
+
+    @Column(name = "domain", nullable = false, length = 16)
+    private String domain;
 
     public Long getId() {
         return id;
@@ -133,6 +139,9 @@ public class AlertRecordEntity {
     public String getOwner() { return owner; }
     public void setOwner(String owner) { this.owner = owner; }
 
+    public String getOwnerUserId() { return ownerUserId; }
+    public void setOwnerUserId(String ownerUserId) { this.ownerUserId = ownerUserId; }
+
     public String getProcessStatus() { return processStatus; }
     public void setProcessStatus(String processStatus) { this.processStatus = processStatus; }
 
@@ -141,4 +150,7 @@ public class AlertRecordEntity {
 
     public LocalDateTime getHandledAt() { return handledAt; }
     public void setHandledAt(LocalDateTime handledAt) { this.handledAt = handledAt; }
+
+    public String getDomain() { return domain; }
+    public void setDomain(String domain) { this.domain = domain; }
 }

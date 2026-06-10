@@ -11,7 +11,7 @@ defineProps({
     <div class="panel-head">
       <div>
         <p class="panel-kicker">告警信息面板</p>
-        <h2>实时告警与高亮处置建议</h2>
+        <h2>实时告警与高亮展示</h2>
       </div>
       <span class="pill" :class="alertCountTone">{{ alerts.length }} 条告警</span>
     </div>
@@ -20,7 +20,7 @@ defineProps({
       <template v-if="!alerts.length">
         <article class="empty-card">
           <h3>暂无告警</h3>
-          <p>当前车辆未返回告警记录，页面会继续轮询并自动刷新高亮状态。</p>
+          <p>当前车辆没有返回新的告警记录，页面会继续轮询并在出现风险时自动高亮显示。</p>
         </article>
       </template>
 

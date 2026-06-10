@@ -43,12 +43,12 @@ const headStats = computed(() => [
   {
     label: "我的车辆数",
     value: String(dashboard.state.vehicles.length || 0),
-    detail: "监控列表仅显示当前账号名下车辆",
+    detail: "监控列表只显示当前账号名下车辆",
   },
   {
     label: "当前车辆",
-    value: dashboard.state.vehicleId || "--",
-    detail: dashboard.state.vehicleMeta?.plateNumber || "等待选择本人车辆",
+    value: dashboard.state.vehicleMeta?.vehicleId || "--",
+    detail: dashboard.state.vehicleMeta?.plateNumber || "等待选择车辆",
   },
   {
     label: "风险等级",
@@ -109,12 +109,12 @@ onBeforeUnmount(() => {
             <select
               id="vehicle-select"
               aria-label="选择车辆"
-              :value="dashboard.state.vehicleId"
+              :value="dashboard.state.selectedVehicleKey"
               :disabled="!hasVehicles"
               @change="dashboard.selectVehicle($event.target.value)"
             >
               <option v-if="!dashboard.state.vehicles.length" value="">暂无可监控车辆</option>
-              <option v-for="vehicle in dashboard.state.vehicles" :key="vehicle.vehicleId" :value="vehicle.vehicleId">
+              <option v-for="vehicle in dashboard.state.vehicles" :key="vehicle.vehicleKey" :value="vehicle.vehicleKey">
                 {{ vehicle.vehicleId }}
               </option>
             </select>
@@ -123,7 +123,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="meta-card">
-          <span>系统时间</span>
+          <span>监控时间</span>
           <strong>{{ dashboard.systemTimeLabel.value }}</strong>
           <small>{{ dashboard.recordTimeLabel.value }}</small>
         </div>
@@ -151,7 +151,7 @@ onBeforeUnmount(() => {
 
     <section v-if="!hasVehicles" class="panel empty-card dashboard-empty">
       <h3>当前账号下暂无可监控车辆</h3>
-      <p>如果你已经分配了车辆，这里会只展示属于你自己的车辆；如果还没有，可以先到“我的车辆”页面查看当前归属情况。</p>
+      <p>如果你已经分配了车辆，这里会只显示属于你自己的车辆；如果还没有，可以先到“我的车辆”页面中创建或维护车辆。</p>
       <div class="hero-actions">
         <button class="ghost-button primary" type="button" @click="$emit('open-vehicles')">前往我的车辆</button>
       </div>
@@ -166,8 +166,10 @@ onBeforeUnmount(() => {
           :active-point="dashboard.activePoint.value"
           :active-index="dashboard.activeIndex.value"
           :latest-index="dashboard.latestIndex.value"
+          :follow-latest="dashboard.state.followLatest"
           :replay-active="dashboard.state.replayActive"
           :route-tone="dashboard.routeTone.value"
+          @focus-latest="dashboard.focusLatest()"
           @toggle-replay="dashboard.toggleReplay()"
           @set-active-index="dashboard.setActiveIndex"
         />
@@ -176,6 +178,7 @@ onBeforeUnmount(() => {
           :history="dashboard.state.history"
           :active-point="dashboard.activePoint.value"
           :active-index="dashboard.activeIndex.value"
+          :follow-latest="dashboard.state.followLatest"
           :latest-telemetry="dashboard.state.latestTelemetry"
           :selected-vehicle="dashboard.state.vehicleMeta"
           :temperature-tone="dashboard.temperatureTone.value"

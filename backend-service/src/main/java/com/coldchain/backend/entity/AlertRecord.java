@@ -13,7 +13,9 @@ public record AlertRecord(
         LocalDateTime triggerTime,
         String status,
         String owner,
+        String ownerUserId,
         String processStatus,
         String note,
-        LocalDateTime handledAt) {
+        LocalDateTime handledAt,
+        String domain) {
 }

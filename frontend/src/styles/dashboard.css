@@ -59,6 +59,60 @@ select {
   min-height: 100vh;
 }
 
+.global-notice {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: min(560px, calc(100vw - 32px));
+  max-width: min(680px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border: 1px solid rgba(122, 189, 198, 0.24);
+  border-radius: 18px;
+  background: rgba(6, 26, 37, 0.96);
+  box-shadow: var(--shadow);
+  transform: translateX(-50%);
+  backdrop-filter: blur(12px);
+}
+
+.global-notice.warning {
+  border-color: rgba(255, 191, 90, 0.3);
+  background: rgba(45, 31, 10, 0.96);
+}
+
+.global-notice.error {
+  border-color: rgba(255, 106, 106, 0.32);
+  background: rgba(55, 20, 23, 0.96);
+}
+
+.global-notice span {
+  flex: 1;
+  line-height: 1.6;
+}
+
+.global-notice button {
+  border: 1px solid rgba(122, 189, 198, 0.24);
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: var(--text);
+  background: rgba(3, 16, 23, 0.72);
+  cursor: pointer;
+}
+
+.notice-fade-enter-active,
+.notice-fade-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.notice-fade-enter-from,
+.notice-fade-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -8px);
+}
+
 .portal-header {
   display: flex;
   justify-content: space-between;
@@ -1525,6 +1579,14 @@ h2 {
 }
 
 @media (max-width: 720px) {
+  .global-notice {
+    top: 12px;
+    min-width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .portal-header,
   .dashboard-shell,
   .workspace-section {

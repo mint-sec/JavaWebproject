@@ -12,5 +12,7 @@ public record UserRecord(
         String role,
         String status,
         String origin,
-        LocalDateTime createdAt) {
+        LocalDateTime createdAt,
+        int loginFailureCount,
+        LocalDateTime lockedUntil) {
 }

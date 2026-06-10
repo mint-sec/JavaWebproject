@@ -16,6 +16,8 @@ logging:
 app:
   simulation:
     step-seconds: 5
+    sample-interval-seconds: 30
+    reset-telemetry-on-startup: true
   algorithm:
     mode: http-gateway
     version: mock-risk-v1
@@ -23,3 +25,4 @@ app:
     base-url: http://localhost:5001
     evaluate-path: /evaluate
     simulation-telemetry-path: /simulation/telemetry
+    realtime-telemetry-path: /simulation/realtime/{vehicleCode}

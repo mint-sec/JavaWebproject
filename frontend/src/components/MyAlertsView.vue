@@ -21,6 +21,7 @@ const feedback = reactive({
   text: "",
 });
 const alertDrafts = reactive({});
+const savingAlertIds = reactive({});
 
 const alertLevelOptions = getAlertLevelOptions();
 const alertStatusOptions = getAlertStatusOptions();
@@ -29,7 +30,7 @@ const overviewCards = computed(() => {
   const cards = data.value?.overviewCards || [];
   return cards.filter((card) => ["待处理告警", "处理中告警", "已处理告警"].includes(card.label));
 });
-const alerts = computed(() => data.value?.alerts || []);
+const alerts = computed(() => (data.value?.alerts || []).filter((alert) => alert.status !== "已处理"));
 
 function setFeedback(type, text) {
   feedback.type = type;
@@ -52,14 +53,16 @@ function syncAlertDrafts(nextAlerts) {
   Object.keys(alertDrafts).forEach((key) => {
     delete alertDrafts[key];
   });
-  nextAlerts.forEach((alert) => {
-    alertDrafts[alert.id] = {
-      owner: alert.owner,
-      status: alert.status,
-      level: alert.level,
-      note: alert.note || "",
-    };
-  });
+  nextAlerts
+    .filter((alert) => alert.status !== "已处理")
+    .forEach((alert) => {
+      alertDrafts[alert.id] = {
+        owner: alert.owner,
+        status: alert.status,
+        level: alert.level,
+        note: alert.note || "",
+      };
+    });
 }
 
 async function loadAlertsWorkspace() {
@@ -76,12 +79,18 @@ async function loadAlertsWorkspace() {
 }
 
 async function saveAlert(alert) {
+  if (savingAlertIds[alert.id]) {
+    return;
+  }
+  savingAlertIds[alert.id] = true;
   try {
     await updateAlertForUser(props.currentUser, alert.id, ensureAlertDraft(alert));
     await loadAlertsWorkspace();
     setFeedback("success", `已更新告警 ${alert.id} 的处理结果。`);
   } catch (error) {
     setFeedback("error", error.message);
+  } finally {
+    delete savingAlertIds[alert.id];
   }
 }
 
@@ -163,15 +172,24 @@ onMounted(() => {
           </div>
 
           <div class="admin-inline-actions">
-            <button class="table-action" type="button" @click="saveAlert(alert)">保存处理结果</button>
-            <button class="table-action success" type="button" @click="markAlertHandled(alert)">标记为已处理</button>
+            <button class="table-action" type="button" :disabled="Boolean(savingAlertIds[alert.id])" @click="saveAlert(alert)">
+              {{ savingAlertIds[alert.id] ? "保存中..." : "保存处理结果" }}
+            </button>
+            <button
+              class="table-action success"
+              type="button"
+              :disabled="Boolean(savingAlertIds[alert.id])"
+              @click="markAlertHandled(alert)"
+            >
+              {{ savingAlertIds[alert.id] ? "提交中..." : "标记为已处理" }}
+            </button>
           </div>
         </article>
       </div>
 
       <div v-else class="workspace-empty">
-        <h3>当前没有分配给你的业务告警</h3>
-        <p>后续接入后端后，这里可以直接只返回当前登录用户负责的告警列表。</p>
+        <h3>当前没有待跟进的业务告警</h3>
+        <p>已处理告警不会继续显示在这里，后续如有新的待处理或处理中告警会自动出现在列表中。</p>
       </div>
     </section>
   </section>

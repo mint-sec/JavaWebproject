@@ -17,6 +17,9 @@ public class VehicleEntity {
     @Column(name = "vehicle_code", nullable = false, unique = true, length = 32)
     private String vehicleCode;
 
+    @Column(name = "display_code", nullable = false, length = 32)
+    private String displayCode;
+
     @Column(name = "plate_number", nullable = false, length = 32)
     private String plateNumber;
 
@@ -35,11 +38,17 @@ public class VehicleEntity {
     @Column(name = "status", nullable = false, length = 32)
     private String status;
 
+    @Column(name = "owner_user_id", nullable = false, length = 32)
+    private String ownerUserId;
+
     @Column(length = 32)
     private String driver;
 
     @Column(length = 128)
     private String route;
+
+    @Column(name = "route_distance_km", nullable = false)
+    private double routeDistanceKm;
 
     @Column(name = "updated_at")
     private java.time.LocalDateTime updatedAt;
@@ -54,6 +63,14 @@ public class VehicleEntity {
 
     public void setVehicleCode(String vehicleCode) {
         this.vehicleCode = vehicleCode;
+    }
+
+    public String getDisplayCode() {
+        return displayCode;
+    }
+
+    public void setDisplayCode(String displayCode) {
+        this.displayCode = displayCode;
     }
 
     public String getPlateNumber() {
@@ -104,11 +121,22 @@ public class VehicleEntity {
         this.status = status;
     }
 
+    public String getOwnerUserId() {
+        return ownerUserId;
+    }
+
+    public void setOwnerUserId(String ownerUserId) {
+        this.ownerUserId = ownerUserId;
+    }
+
     public String getDriver() { return driver; }
     public void setDriver(String driver) { this.driver = driver; }
 
     public String getRoute() { return route; }
     public void setRoute(String route) { this.route = route; }
+
+    public double getRouteDistanceKm() { return routeDistanceKm; }
+    public void setRouteDistanceKm(double routeDistanceKm) { this.routeDistanceKm = routeDistanceKm; }
 
     public java.time.LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(java.time.LocalDateTime updatedAt) { this.updatedAt = updatedAt; }

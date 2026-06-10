@@ -1,11 +1,14 @@
 package com.coldchain.backend.dto;
 
 public record VehicleResponse(
+        String vehicleKey,
+        String vehicleId,
         String vehicleCode,
         String plateNumber,
         String cargoType,
         String cargoName,
         double safeTempMin,
         double safeTempMax,
-        String status) {
+        String status,
+        double routeDistanceKm) {
 }
