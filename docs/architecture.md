@@ -55,11 +55,13 @@
 
 | 组件 | 职责 |
 |---|---|
-| `AnomalyDetector` | 异常检测 (阈值 + 趋势) |
-| `RiskScorer` | 风险评分与等级映射 |
-| `RoutePlanner` | 路径重规划建议生成 |
+| `AnomalyDetector` | 四级异常检测（阈值越界 → 车门事件 → 短窗口趋势 → 长窗口趋势），含趋势防误报计数器 (risk-v3) |
+| `RiskScorer` | 6 因子加权风险评分 + 特殊加成 + 等级映射 (HIGH/MEDIUM/LOW) |
+| `RoutePlanner` | 7 场景路径建议生成，综合风险等级、剩余里程、车门状态、外部温度 |
 | `DataGenerator` | 模拟遥测数据生成 |
 | `RealtimeSimulationService` | 实时仿真数据推送 |
+
+三道流水线串行依赖：AnomalyDetector → RiskScorer → RoutePlanner。趋势型异常（`TREND_RISE`）需连续 TREND_CONFIRM_REQUIRED 次确认后才上报，阈值越界和车门事件照常立即报告。
 
 ### frontend（前端）
 
