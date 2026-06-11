@@ -2,9 +2,11 @@ package com.coldchain.algorithm.service;
 
 import com.coldchain.algorithm.model.EvaluateRequest;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 异常检测模块（第 2 周优化版）
+ * 异常检测模块（第 3 周优化版）
  *
  * 四种检测方式：
  * 1. 阈值越界：温度直接超出 [safeMin, safeMax]
@@ -12,7 +14,9 @@ import java.util.List;
  * 3. 短窗口趋势（15 分钟）：3 个点快速升温
  * 4. 车门事件：车门开 + 外部 >28°C → 热量灌入
  *
- * 防误报：趋势型异常需连续触发才确认
+ * 防误报机制（第 3 周新增）：
+ * 趋势型异常需连续触发 TREND_CONFIRM_REQUIRED 次才正式报告，
+ * 避免温度噪声造成的单次误报。温度恢复后自动重置计数器。
  */
 public class AnomalyDetector {
 
@@ -29,9 +33,11 @@ public class AnomalyDetector {
     /** 车门事件：外部温度阈值 */
     private static final double DOOR_OUTSIDE_THRESHOLD = 28.0;
 
-    // ========== 防误报状态（仅本实例内有效，每次评估独立） ==========
-    // 注：后端对每辆车单独调用 /evaluate，所以这里用简单实例变量即可
-    // 若要跨请求持久化，需由后端维护历史状态
+    /** 趋势型异常需连续触发多少次才确认（防误报） */
+    private static final int TREND_CONFIRM_REQUIRED = 2;
+
+    /** 每辆车的趋势触发计数：vehicleCode → 连续触发次数 */
+    private final Map<String, Integer> trendConfirmCounters = new ConcurrentHashMap<>();
 
     /**
      * 主入口
@@ -59,8 +65,9 @@ public class AnomalyDetector {
             if (door != null) return door;
         }
 
-        // 3. 双窗口趋势检测
-        return dualWindowDetect(latest, history, safeMin, safeMax);
+        // 3. 双窗口趋势检测（带防误报）
+        AnomalyResult trendResult = dualWindowDetect(latest, history, safeMin, safeMax);
+        return applyTrendAntiFlapping(request.getVehicleCode(), trendResult);
     }
 
     // ==================== 车门事件 ====================
@@ -127,6 +134,32 @@ public class AnomalyDetector {
         }
 
         return AnomalyResult.normal();
+    }
+
+    // ==================== 防误报 ====================
+
+    /**
+     * 趋势型异常防误报：需连续触发 TREND_CONFIRM_REQUIRED 次才正式报告
+     *
+     * 逻辑：
+     *   - 趋势检测到 TREND_RISE → 计数器 +1
+     *   - 计数器达到阈值 → 确认异常，持续返回（不再重复计数）
+     *   - 趋势恢复正常 → 重置计数器
+     *   - 阈值越界 / 车门事件不受影响（它们本来就是硬事件）
+     */
+    private AnomalyResult applyTrendAntiFlapping(String vehicleCode, AnomalyResult result) {
+        if (result.isDetected() && "TREND_RISE".equals(result.getType())) {
+            int count = trendConfirmCounters.merge(vehicleCode, 1, Integer::sum);
+            if (count >= TREND_CONFIRM_REQUIRED) {
+                return result; // 已确认，正常返回
+            }
+            // 未达确认阈值，压制本次告警
+            return new AnomalyResult(false, "NONE",
+                    "趋势预警收集中（" + count + "/" + TREND_CONFIRM_REQUIRED + "）", 0);
+        }
+        // 趋势消失或不是趋势型异常 → 重置计数器
+        trendConfirmCounters.remove(vehicleCode);
+        return result;
     }
 
     // ==================== 工具方法 ====================
